@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/shared" },
+    { "path": "./packages/model-gateway" },
+    { "path": "./packages/connectors" },
+    { "path": "./packages/orchestrator" },
+    { "path": "./packages/channels" },
+    { "path": "./packages/console" }
+  ]
+}

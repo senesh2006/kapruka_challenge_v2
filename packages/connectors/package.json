@@ -1,0 +1,24 @@
+{
+  "name": "@sevana/connectors",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./catalogue": "./dist/catalogue/index.js",
+    "./delivery": "./dist/delivery/index.js",
+    "./checkout": "./dist/checkout/index.js",
+    "./crm": "./dist/crm/index.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@sevana/shared": "workspace:*",
+    "zod": "^3.22.4"
+  }
+}

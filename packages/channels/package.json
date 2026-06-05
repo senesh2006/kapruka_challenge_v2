@@ -1,0 +1,24 @@
+{
+  "name": "@sevana/channels",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./widget": "./dist/widget/index.js",
+    "./full-page": "./dist/full-page/index.js",
+    "./mobile-sdk": "./dist/mobile-sdk/index.js",
+    "./messaging": "./dist/messaging/index.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@sevana/shared": "workspace:*",
+    "@sevana/orchestrator": "workspace:*"
+  }
+}
