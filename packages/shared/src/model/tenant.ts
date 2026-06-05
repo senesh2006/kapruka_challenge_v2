@@ -27,22 +27,34 @@ export const GuardrailsSchema = z.object({
 });
 export type Guardrails = z.infer<typeof GuardrailsSchema>;
 
-export const ConnectorBindingsSchema = z.object({
-  catalogue: z.string(),
-  delivery: z.string(),
-  checkout: z.string(),
-  crm: z.string().optional(),
+export const ConnectorKindSchema = z.enum(["catalogue", "delivery", "checkout", "crm"]);
+export type ConnectorKind = z.infer<typeof ConnectorKindSchema>;
+
+export const ConnectorBindingSchema = z.object({
+  kind: ConnectorKindSchema,
+  adapter: z.string().min(1),
+  credentialRef: z.string().min(1),
 });
-export type ConnectorBindings = z.infer<typeof ConnectorBindingsSchema>;
+export type ConnectorBinding = z.infer<typeof ConnectorBindingSchema>;
+
+export const ScopedCredentialSchema = z.object({
+  ref: z.string().min(1),
+  connectorKind: ConnectorKindSchema,
+  scopes: z.array(z.string()).default([]),
+  rotatedAt: z.string().datetime().optional(),
+});
+export type ScopedCredential = z.infer<typeof ScopedCredentialSchema>;
 
 export const TenantSchema = z.object({
   id: TenantIdSchema,
   name: z.string(),
-  enabledChannels: z.array(ChannelSchema),
+  enabledChannels: z.array(ChannelSchema).min(1),
   persona: PersonaSchema,
   merchandising: MerchandisingRulesSchema,
   guardrails: GuardrailsSchema,
-  connectors: ConnectorBindingsSchema,
+  connectors: z.array(ConnectorBindingSchema).min(1),
+  credentials: z.array(ScopedCredentialSchema).default([]),
   createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
 });
 export type Tenant = z.infer<typeof TenantSchema>;

@@ -1,13 +1,25 @@
 import { z } from "zod";
-import { CustomerIdSchema, LocaleSchema, TenantIdSchema } from "./primitives.js";
+import {
+  CustomerIdSchema,
+  LocaleSchema,
+  OrderIdSchema,
+  SessionIdSchema,
+  TenantIdSchema,
+} from "./primitives.js";
 
-export const RelationshipSchema = z.object({
-  name: z.string(),
-  relation: z.string(),
-  importantDates: z.array(z.string().datetime()).default([]),
-  notes: z.string().optional(),
+export const ConsentSchema = z.object({
+  memoryOptIn: z.boolean(),
+  marketingOptIn: z.boolean(),
+  capturedAt: z.string().datetime(),
 });
-export type Relationship = z.infer<typeof RelationshipSchema>;
+export type Consent = z.infer<typeof ConsentSchema>;
+
+export const ConsentedIdentitySchema = z.object({
+  displayName: z.string().optional(),
+  email: z.string().email().optional(),
+  phone: z.string().optional(),
+});
+export type ConsentedIdentity = z.infer<typeof ConsentedIdentitySchema>;
 
 export const SizeProfileSchema = z.object({
   shirt: z.string().optional(),
@@ -26,17 +38,57 @@ export const TastePreferencesSchema = z.object({
 });
 export type TastePreferences = z.infer<typeof TastePreferencesSchema>;
 
-export const ConsentSchema = z.object({
-  memoryOptIn: z.boolean(),
-  marketingOptIn: z.boolean(),
-  capturedAt: z.string().datetime(),
+export const TasteGraphNodeKindSchema = z.enum([
+  "person",
+  "taste",
+  "category",
+  "brand",
+  "occasion",
+]);
+export type TasteGraphNodeKind = z.infer<typeof TasteGraphNodeKindSchema>;
+
+export const TasteGraphNodeSchema = z.object({
+  id: z.string().min(1),
+  kind: TasteGraphNodeKindSchema,
+  label: z.string(),
+  attributes: z.record(z.string()).default({}),
 });
-export type Consent = z.infer<typeof ConsentSchema>;
+export type TasteGraphNode = z.infer<typeof TasteGraphNodeSchema>;
+
+export const TasteGraphEdgeKindSchema = z.enum([
+  "prefers",
+  "dislikes",
+  "related-to",
+  "bought-for",
+  "occasion-of",
+]);
+export type TasteGraphEdgeKind = z.infer<typeof TasteGraphEdgeKindSchema>;
+
+export const TasteGraphEdgeSchema = z.object({
+  from: z.string().min(1),
+  to: z.string().min(1),
+  kind: TasteGraphEdgeKindSchema,
+  weight: z.number().min(0).max(1).default(0.5),
+});
+export type TasteGraphEdge = z.infer<typeof TasteGraphEdgeSchema>;
+
+export const TasteRelationshipGraphSchema = z.object({
+  nodes: z.array(TasteGraphNodeSchema).default([]),
+  edges: z.array(TasteGraphEdgeSchema).default([]),
+});
+export type TasteRelationshipGraph = z.infer<typeof TasteRelationshipGraphSchema>;
+
+export const InteractionHistorySchema = z.object({
+  pastOrderIds: z.array(OrderIdSchema).default([]),
+  pastSessionIds: z.array(SessionIdSchema).default([]),
+  lastSeenAt: z.string().datetime().optional(),
+});
+export type InteractionHistory = z.infer<typeof InteractionHistorySchema>;
 
 export const CustomerProfileSchema = z.object({
   id: CustomerIdSchema,
   tenantId: TenantIdSchema,
-  displayName: z.string().optional(),
+  identity: ConsentedIdentitySchema.default({}),
   locale: LocaleSchema.optional(),
   consent: ConsentSchema,
   preferences: TastePreferencesSchema.default({
@@ -46,7 +98,11 @@ export const CustomerProfileSchema = z.object({
     cuisines: [],
   }),
   sizes: SizeProfileSchema.optional(),
-  relationships: z.array(RelationshipSchema).default([]),
+  tasteGraph: TasteRelationshipGraphSchema.default({ nodes: [], edges: [] }),
+  history: InteractionHistorySchema.default({
+    pastOrderIds: [],
+    pastSessionIds: [],
+  }),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });

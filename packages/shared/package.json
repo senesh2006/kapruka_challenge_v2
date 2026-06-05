@@ -11,7 +11,8 @@
       "import": "./dist/index.js"
     },
     "./model": "./dist/model/index.js",
-    "./config": "./dist/config/index.js"
+    "./config": "./dist/config/index.js",
+    "./guard": "./dist/guard/index.js"
   },
   "scripts": {
     "build": "tsc -b",
