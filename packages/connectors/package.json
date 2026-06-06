@@ -12,6 +12,7 @@
     "./checkout": "./dist/checkout/index.js",
     "./crm": "./dist/crm/index.js",
     "./mcp": "./dist/mcp/index.js",
+    "./kapruka": "./dist/kapruka/index.js",
     "./registry": "./dist/registry/index.js",
     "./types": "./dist/types/index.js"
   },

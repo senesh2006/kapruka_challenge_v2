@@ -53,6 +53,34 @@ Every MCP response is Zod-validated before reaching the orchestrator — connect
 
 A REST-backed adapter (or any other transport) implements the same four interfaces and registers itself with the registry; the orchestrator can't tell the difference.
 
+### Kapruka adapter
+
+`@sevana/connectors/kapruka` is the production Kapruka MCP adapter. It wires `catalogue`, `delivery`, and `checkout` (no CRM — Kapruka MCP doesn't expose CRM tools) onto a shared per-tenant `KaprukaTransport` that enforces:
+
+- **Rate limits** — sliding-window limiter: 60 req/min global, 30 `kapruka_create_order` calls per hour (PRD NFR-8). Concurrent callers queue.
+- **Exponential backoff** — retries transient errors with jittered backoff up to `maxAttempts` (default 4); Zod validation errors are NOT retried.
+- **Caching** — short TTL on `search` (60s), `getProduct` (5m), `listCategories` / `listDeliveryCities` (30m). `checkDelivery` and the checkout tools are never cached.
+- **Result normalisation** — every Kapruka raw response (snake_case fields, `price_lkr`, `pay_link`, …) is mapped onto the canonical Sevana types. When the MCP returns nothing, the connector returns an explicit empty result — never invented products or prices.
+- **Fault injection** — `transport.fault.setOutage(true)` throws `KaprukaOutageError` immediately so fallback paths can be exercised; `setFailNext(n)` simulates transient failures to exercise backoff.
+- **Credential isolation** — the credential lives inside the `McpClient` closure built by `buildClient(credential)`; no public surface (transport, connector, retailer) exposes it. Channels never see keys.
+
+```ts
+import { ConnectorRegistry, registerKaprukaAdapter } from "@sevana/connectors";
+
+const registry = new ConnectorRegistry();
+const handle = registerKaprukaAdapter(registry, {
+  buildClient: (cred) => makeHttpMcpClient(cred.apiKey!, process.env.KAPRUKA_MCP_BASE_URL!),
+});
+
+const retailer = await registry.resolve(tenant, { credentialResolver });
+const results  = await retailer.catalogue.searchProducts({ query: "birthday cake", limit: 10 });
+const order    = await retailer.checkout.createOrder(orderContext);
+// order.payLink is the Kapruka pay link the customer follows
+
+// Ops only — not exposed to channels:
+handle.getTransport(tenant.id)?.clearCache();
+```
+
 ## Registry
 
 ```ts
