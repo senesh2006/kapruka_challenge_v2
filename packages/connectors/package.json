@@ -10,7 +10,10 @@
     "./catalogue": "./dist/catalogue/index.js",
     "./delivery": "./dist/delivery/index.js",
     "./checkout": "./dist/checkout/index.js",
-    "./crm": "./dist/crm/index.js"
+    "./crm": "./dist/crm/index.js",
+    "./mcp": "./dist/mcp/index.js",
+    "./registry": "./dist/registry/index.js",
+    "./types": "./dist/types/index.js"
   },
   "scripts": {
     "build": "tsc -b",
