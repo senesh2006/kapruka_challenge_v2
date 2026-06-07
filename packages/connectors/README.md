@@ -1,5 +1,27 @@
 # @sevana/connectors
 
+## Webhooks
+
+`@sevana/connectors/webhooks` ingests order, payment, and fulfilment events from a retailer (PRD §10).
+
+- **Signature verification** — `HmacSha256Verifier` with timing-safe compare; optional timestamp tolerance to prevent replay.
+- **Per-tenant secrets** — resolved through `WebhookSecretResolver` (channels never see keys).
+- **Idempotency** — `IdempotencyStore.tryReserve` + `commit` / `release`. A reservation is created before publish; on publish failure the reservation is released so the retailer's redelivery is reprocessed.
+- **Internal retry** — exponential backoff when the event bus rejects a publish.
+- **Mapping** — `KaprukaWebhookMapper` (default) maps `order.*`, `payment.*`, `fulfilment.*` event types onto the canonical `Event` union from `@sevana/shared`. Each event carries the resolved `tenantId`.
+- **Bus** — `InMemoryEventBus` (`subscribe(kind | "*", handler)`, `publish(event)`). Analytics and retention services subscribe here.
+
+`WebhookReceiver.handle({ tenantId, rawBody, headers })` returns one of:
+- `{ status: "accepted", event }` — verified, mapped, published.
+- `{ status: "duplicate", eventId }` — already processed.
+- `{ status: "rejected", code, reason }` — `signature` / `tenant` / `payload` / `unsupported` / `no-event-id`.
+
+A bus publish failure that exhausts retry propagates as a thrown error — the HTTP layer can return 5xx and the retailer retries.
+
+---
+
+
+
 Transport-agnostic connector contract that any retailer can implement. The orchestrator only ever talks to a `RetailerConnector` — never to a raw MCP, REST, or gRPC client — so transports can be swapped per tenant without touching agent code.
 
 ## Capability groups

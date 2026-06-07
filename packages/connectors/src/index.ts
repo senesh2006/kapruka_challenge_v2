@@ -7,3 +7,4 @@ export * from "./retailer.js";
 export * from "./registry/index.js";
 export * from "./mcp/index.js";
 export * from "./kapruka/index.js";
+export * from "./webhooks/index.js";
