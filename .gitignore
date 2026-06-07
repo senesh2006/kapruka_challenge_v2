@@ -26,3 +26,7 @@ pnpm-debug.log*
 # test / coverage
 coverage
 .nyc_output
+
+# python bytecode (from .claude skills)
+__pycache__
+*.pyc
