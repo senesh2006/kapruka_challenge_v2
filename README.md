@@ -90,6 +90,65 @@ pnpm test              # vitest run
 pnpm test:watch        # vitest in watch mode
 ```
 
-## Status
+## Deploy to Vercel
 
-This commit is a **scaffold only** — directory tree, configs, and the shared data model. No business logic is implemented yet; that is the work of subsequent phases per the PRD rollout plan.
+The merchant console deploys as a Vite static SPA, with Vercel serverless functions at `/api/*` for the orchestrator turn endpoint and the retailer webhook receiver.
+
+### One-time setup
+
+1. Push the repo to GitHub (already done if you're reading this).
+2. In Vercel, **Import Project** → pick `senesh2006/kapruka_challenge_v2`.
+3. Vercel auto-detects pnpm via `packageManager` in `package.json`. The `vercel.json` already specifies:
+   - **Build command:** `pnpm --filter @sevana/console build`
+   - **Output directory:** `packages/console/dist`
+   - **SPA fallback:** any non-`/api/`, non-`/assets/` path serves `index.html` (React Router).
+4. Set environment variables in Vercel (Project Settings → Environment Variables):
+
+| Variable | Used by | Notes |
+|---|---|---|
+| `WEBHOOK_SECRET` | `/api/webhook` | HMAC-SHA256 secret used to verify retailer webhooks. |
+| `NIM_API_KEY` *(prod)* | `/api/turn` (when wired) | Per-tenant NVIDIA NIM key. The scaffold stub doesn't use this. |
+| `KAPRUKA_MCP_BASE_URL` *(prod)* | `/api/turn` (when wired) | Kapruka MCP base URL for the connector. |
+
+### What deploys
+
+- **Static SPA** at `/` — full merchant console with seven routed pages.
+- **`GET /api/health`** — health check.
+- **`POST /api/turn`** — orchestrator turn endpoint. Currently a **scaffold stub** that returns a canned reply matching the `TurnResult` shape. Production wires in `@sevana/orchestrator` with the six agents + the Kapruka connector + the NIM model gateway.
+- **`POST /api/webhook`** — retailer webhook endpoint. Signature-verifies the HMAC-SHA256 header and returns 202. Production wires in `@sevana/connectors/webhooks` → `WebhookReceiver`.
+
+### Local Vercel build
+
+```bash
+pnpm run build:vercel    # what Vercel runs
+pnpm --filter @sevana/console preview
+```
+
+### Verifying the deploy
+
+```bash
+curl https://<your-deploy>.vercel.app/api/health
+curl -X POST https://<your-deploy>.vercel.app/api/turn \
+  -H 'content-type: application/json' \
+  -d '{"message":"Birthday cake for amma in Galle","sessionId":"demo"}'
+```
+
+## Phase-1 progress against the PRD build pack
+
+| Prompt | Package | Status |
+|---|---|---|
+| 1.1 Scaffold the monorepo | (root) | ✅ |
+| 1.2 Per-tenant data model + guard + migrations | `@sevana/shared` | ✅ |
+| 2.1 Connector contract | `@sevana/connectors` | ✅ |
+| 2.2 Kapruka MCP connector (rate-limits, cache, backoff, fault injection) | `@sevana/connectors/kapruka` | ✅ |
+| 2.3 Webhook receiver | `@sevana/connectors/webhooks` | ✅ |
+| 3.1 NIM client + model router + fallback | `@sevana/model-gateway` | ✅ |
+| 4.1 Orchestrator + multi-agent loop | `@sevana/orchestrator` | ✅ |
+| 5.1–5.6 The six agents (interfaces + stub impls) | `@sevana/orchestrator/agents` | ✅ |
+| 6.1 End-to-end commerce flow | — | ⏭ pending |
+| 7.1 Personalisation store | — | ⏭ pending |
+| 8.1 Widget + full-page channels | `@sevana/channels` | ⏭ pending |
+| 9.x Merchant console pages | `@sevana/console` | ✅ (mocked data) |
+| 10.1 Analytics | partial in console | ⏭ pending (real wiring) |
+| 11.x Hardening | — | ⏭ pending |
+| 12.1 Staging validation | — | ⏭ pending |

@@ -30,3 +30,6 @@ coverage
 # python bytecode (from .claude skills)
 __pycache__
 *.pyc
+
+# vercel local build output
+.vercel
