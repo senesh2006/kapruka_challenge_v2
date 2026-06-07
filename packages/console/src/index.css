@@ -1,0 +1,103 @@
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 224 71% 14%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 224 71% 14%;
+
+    --primary: 224 76% 40%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 217 91% 60%;
+    --secondary-foreground: 0 0% 100%;
+
+    --accent: 38 92% 50%;
+    --accent-foreground: 224 71% 14%;
+
+    --muted: 215 28% 95%;
+    --muted-foreground: 215 16% 47%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 224 71% 14%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 224 76% 40%;
+
+    --sidebar: 224 71% 14%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-accent: 217 91% 60%;
+    --sidebar-accent-foreground: 0 0% 100%;
+
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    --background: 224 71% 6%;
+    --foreground: 210 40% 98%;
+    --card: 224 71% 9%;
+    --card-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 224 71% 14%;
+    --secondary: 224 76% 40%;
+    --secondary-foreground: 210 40% 98%;
+    --accent: 38 92% 50%;
+    --accent-foreground: 224 71% 6%;
+    --muted: 217 33% 14%;
+    --muted-foreground: 215 20% 65%;
+    --destructive: 0 63% 50%;
+    --destructive-foreground: 210 40% 98%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 224 71% 6%;
+    --border: 217 33% 18%;
+    --input: 217 33% 18%;
+    --ring: 217 91% 60%;
+    --sidebar: 224 71% 9%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-accent: 217 91% 60%;
+    --sidebar-accent-foreground: 224 71% 14%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  /* Visible focus rings — accessibility checklist */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Respect prefers-reduced-motion — accessibility checklist */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

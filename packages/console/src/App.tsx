@@ -1,8 +1,28 @@
-export function App(): JSX.Element {
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { AppShell } from "./components/layout/AppShell.js";
+import { AnalyticsPage } from "./pages/Analytics.js";
+import { ConversationsPage } from "./pages/Conversations.js";
+import { ExperimentsPage } from "./pages/Experiments.js";
+import { GuardrailsPage } from "./pages/Guardrails.js";
+import { MerchandisingPage } from "./pages/Merchandising.js";
+import { OverviewPage } from "./pages/Overview.js";
+import { PersonaStudioPage } from "./pages/PersonaStudio.js";
+
+export function App() {
   return (
-    <main>
-      <h1>Sevana Console</h1>
-      <p>Scaffold — persona, merchandising, guardrails, experiments, and analytics will live here.</p>
-    </main>
+    <BrowserRouter>
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route index element={<OverviewPage />} />
+          <Route path="/persona" element={<PersonaStudioPage />} />
+          <Route path="/merchandising" element={<MerchandisingPage />} />
+          <Route path="/guardrails" element={<GuardrailsPage />} />
+          <Route path="/experiments" element={<ExperimentsPage />} />
+          <Route path="/conversations" element={<ConversationsPage />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }
