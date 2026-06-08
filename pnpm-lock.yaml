@@ -14,6 +14,9 @@ importers:
       '@sevana/connectors':
         specifier: workspace:*
         version: link:packages/connectors
+      '@sevana/observability':
+        specifier: workspace:*
+        version: link:packages/observability
       '@sevana/orchestrator':
         specifier: workspace:*
         version: link:packages/orchestrator
@@ -151,6 +154,15 @@ importers:
       zod:
         specifier: ^3.22.4
         version: 3.25.76
+
+  packages/observability:
+    dependencies:
+      '@sevana/orchestrator':
+        specifier: workspace:*
+        version: link:../orchestrator
+      '@sevana/shared':
+        specifier: workspace:*
+        version: link:../shared
 
   packages/orchestrator:
     dependencies:

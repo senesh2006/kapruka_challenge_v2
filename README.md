@@ -165,5 +165,7 @@ curl -X POST https://<your-deploy>.vercel.app/api/turn \
 | 8.1 Widget + full-page channels | `@sevana/channels` + `/chat` route + `FloatingWidget` | ✅ (cross-site embed bundle pending) |
 | 9.x Merchant console pages | `@sevana/console` | ✅ (Analytics page wired to real data; others use mocks until console-side write APIs exist) |
 | 10.1 Analytics + demand signals | `@sevana/analytics` + `/api/analytics` | ✅ |
-| 11.x Hardening | — | ⏭ pending |
+| 11.1 Observability (tracing + structured logging) | `@sevana/observability` + `ConsoleLogger` wired into `_lib.ts` | ✅ |
+| 11.2 Fallbacks + chaos | `FaultInjectableBlobAdapter` + orchestrator `chaos.test.ts` (8 scenarios) | ✅ (current behaviour pinned; further graceful-degradation work tracked in tests) |
+| 11.3 i18n | — | ⏭ pending |
 | 12.1 Staging validation | — | ⏭ pending |

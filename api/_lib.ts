@@ -27,6 +27,12 @@ import {
 } from "@sevana/orchestrator";
 import { AnalyticsRecorder, AnalyticsQueries } from "@sevana/analytics";
 import {
+  ConsoleLogger,
+  bindOrchestratorLogging,
+  newTraceId,
+  type Logger,
+} from "@sevana/observability";
+import {
   InMemoryEventBus,
   type EventBus,
   type RetailerConnector,
@@ -54,6 +60,7 @@ let cached: {
   bus: EventBus;
   recorder: AnalyticsRecorder;
   analytics: AnalyticsQueries;
+  logger: Logger;
 } | null = null;
 
 async function buildAdapter(): Promise<BlobStorageAdapter> {
@@ -189,6 +196,18 @@ export async function bootstrap() {
   // Subscribe analytics to both surfaces so every shipped event lands in Blob.
   recorder.attachToOrchestrator(orchestrator);
   recorder.attachToBus(bus);
+
+  // Structured per-instance logger. Trace id ties the lifetime of this Lambda
+  // instance together; each turn enriches with sessionId via .with().
+  const logger: Logger = new ConsoleLogger(
+    { level: (process.env.LOG_LEVEL as never) ?? "info" },
+    { traceId: newTraceId() },
+  );
+  bindOrchestratorLogging(orchestrator, logger);
+  logger.info("sevana.bootstrap", {
+    blob: process.env.BLOB_READ_WRITE_TOKEN ? "vercel" : "in-memory",
+    webhookSecret: process.env.WEBHOOK_SECRET ? "configured" : "missing",
+  });
   cached = {
     adapter,
     retention,
@@ -202,6 +221,7 @@ export async function bootstrap() {
     bus,
     recorder,
     analytics: new AnalyticsQueries(events),
+    logger,
   };
   return cached;
 }

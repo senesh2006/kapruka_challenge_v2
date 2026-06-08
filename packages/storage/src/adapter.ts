@@ -156,3 +156,70 @@ export class VercelBlobAdapter implements BlobStorageAdapter {
     );
   }
 }
+
+// ---------------- fault injection (chaos testing) ----------------
+
+export interface FaultInjectableBlobAdapterOptions {
+  /** Wrapped adapter to delegate to when not failing. */
+  inner: BlobStorageAdapter;
+  /** When true, every call throws BlobAdapterOutageError. */
+  outage?: boolean;
+  /** When > 0, the next N calls throw; the counter decrements each throw. */
+  failNext?: number;
+}
+
+export class BlobAdapterOutageError extends Error {
+  constructor() {
+    super("Blob storage is unavailable (fault-injected outage)");
+    this.name = "BlobAdapterOutageError";
+  }
+}
+
+/**
+ * Test-mode wrapper that lets chaos tests simulate a Blob outage. Production
+ * deployments do not use this. The PRD requires every external dependency
+ * to have a defined fallback (NFR-4 / NFR-5); chaos tests use this adapter
+ * to disable storage in turn and confirm the orchestrator + analytics
+ * degrade gracefully.
+ */
+export class FaultInjectableBlobAdapter implements BlobStorageAdapter {
+  private outage: boolean;
+  private failNext: number;
+
+  constructor(private readonly opts: FaultInjectableBlobAdapterOptions) {
+    this.outage = opts.outage ?? false;
+    this.failNext = opts.failNext ?? 0;
+  }
+
+  setOutage(on: boolean): void {
+    this.outage = on;
+  }
+  setFailNext(n: number): void {
+    this.failNext = Math.max(0, n);
+  }
+
+  private guard(): void {
+    if (this.outage) throw new BlobAdapterOutageError();
+    if (this.failNext > 0) {
+      this.failNext -= 1;
+      throw new BlobAdapterOutageError();
+    }
+  }
+
+  async put(pathname: string, body: string): Promise<void> {
+    this.guard();
+    await this.opts.inner.put(pathname, body);
+  }
+  async get(pathname: string): Promise<string | null> {
+    this.guard();
+    return this.opts.inner.get(pathname);
+  }
+  async list(prefix: string): Promise<readonly string[]> {
+    this.guard();
+    return this.opts.inner.list(prefix);
+  }
+  async delete(pathname: string): Promise<void> {
+    this.guard();
+    await this.opts.inner.delete(pathname);
+  }
+}

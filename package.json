@@ -22,6 +22,7 @@
   "dependencies": {
     "@sevana/analytics": "workspace:*",
     "@sevana/connectors": "workspace:*",
+    "@sevana/observability": "workspace:*",
     "@sevana/orchestrator": "workspace:*",
     "@sevana/shared": "workspace:*",
     "@sevana/storage": "workspace:*",

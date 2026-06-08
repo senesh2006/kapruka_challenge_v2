@@ -11,9 +11,11 @@ import {
   type Tenant,
 } from "@sevana/shared";
 import {
+  BlobAdapterOutageError,
   BlobIdempotencyStore,
   CustomerProfileRepository,
   EventRepository,
+  FaultInjectableBlobAdapter,
   InMemoryBlobAdapter,
   SessionRepository,
   STORAGE_PACKAGE,
@@ -248,6 +250,36 @@ describe("StorageRetentionAgent — consent-gated update (PRD §8)", () => {
     const stored = await repo.get("cust-1" as never, scope);
     expect(stored).not.toBeNull();
     expect(stored?.updatedAt).not.toBe(NOW);
+  });
+});
+
+describe("FaultInjectableBlobAdapter (chaos)", () => {
+  it("setOutage(true) makes every call throw BlobAdapterOutageError without touching the inner adapter", async () => {
+    const inner = new InMemoryBlobAdapter();
+    await inner.put("a", "1");
+    const adapter = new FaultInjectableBlobAdapter({ inner, outage: true });
+    await expect(adapter.get("a")).rejects.toBeInstanceOf(BlobAdapterOutageError);
+    await expect(adapter.put("b", "2")).rejects.toBeInstanceOf(BlobAdapterOutageError);
+    expect(inner.size()).toBe(1); // the put on b was blocked
+  });
+
+  it("setFailNext(n) fails the next n calls then recovers", async () => {
+    const inner = new InMemoryBlobAdapter();
+    const adapter = new FaultInjectableBlobAdapter({ inner, failNext: 2 });
+    await expect(adapter.put("a", "1")).rejects.toBeInstanceOf(BlobAdapterOutageError);
+    await expect(adapter.put("b", "2")).rejects.toBeInstanceOf(BlobAdapterOutageError);
+    await adapter.put("c", "3");
+    expect(await adapter.get("c")).toBe("3");
+  });
+
+  it("toggling outage off restores normal behaviour", async () => {
+    const inner = new InMemoryBlobAdapter();
+    const adapter = new FaultInjectableBlobAdapter({ inner });
+    adapter.setOutage(true);
+    await expect(adapter.put("x", "1")).rejects.toBeInstanceOf(BlobAdapterOutageError);
+    adapter.setOutage(false);
+    await adapter.put("x", "1");
+    expect(await adapter.get("x")).toBe("1");
   });
 });
 
