@@ -20,6 +20,7 @@
     "clean": "pnpm -r exec rm -rf dist node_modules .turbo"
   },
   "dependencies": {
+    "@sevana/analytics": "workspace:*",
     "@sevana/connectors": "workspace:*",
     "@sevana/orchestrator": "workspace:*",
     "@sevana/shared": "workspace:*",

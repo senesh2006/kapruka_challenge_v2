@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@sevana/analytics':
+        specifier: workspace:*
+        version: link:packages/analytics
       '@sevana/connectors':
         specifier: workspace:*
         version: link:packages/connectors
@@ -51,6 +54,21 @@ importers:
       vitest:
         specifier: ^1.4.0
         version: 1.6.1(@edge-runtime/vm@3.2.0)(@types/node@20.19.41)
+
+  packages/analytics:
+    dependencies:
+      '@sevana/connectors':
+        specifier: workspace:*
+        version: link:../connectors
+      '@sevana/orchestrator':
+        specifier: workspace:*
+        version: link:../orchestrator
+      '@sevana/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@sevana/storage':
+        specifier: workspace:*
+        version: link:../storage
 
   packages/channels:
     dependencies:

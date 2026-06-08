@@ -25,8 +25,11 @@ import {
   StubConciergeAgent,
   TenantRulesMerchandiserAgent,
 } from "@sevana/orchestrator";
-import type {
-  RetailerConnector,
+import { AnalyticsRecorder, AnalyticsQueries } from "@sevana/analytics";
+import {
+  InMemoryEventBus,
+  type EventBus,
+  type RetailerConnector,
 } from "@sevana/connectors";
 import {
   SessionSchema,
@@ -48,6 +51,9 @@ let cached: {
   events: EventRepository;
   orders: OrderRepository;
   idempotency: BlobIdempotencyStore;
+  bus: EventBus;
+  recorder: AnalyticsRecorder;
+  analytics: AnalyticsQueries;
 } | null = null;
 
 async function buildAdapter(): Promise<BlobStorageAdapter> {
@@ -177,6 +183,12 @@ export async function bootstrap() {
     connectorFor,
     maxRounds: 3,
   });
+  const events = new EventRepository(adapter);
+  const bus: EventBus = new InMemoryEventBus();
+  const recorder = new AnalyticsRecorder({ events });
+  // Subscribe analytics to both surfaces so every shipped event lands in Blob.
+  recorder.attachToOrchestrator(orchestrator);
+  recorder.attachToBus(bus);
   cached = {
     adapter,
     retention,
@@ -184,9 +196,12 @@ export async function bootstrap() {
     sessions: new SessionRepository(adapter),
     tenants: new TenantRepository(adapter),
     customers,
-    events: new EventRepository(adapter),
+    events,
     orders: new OrderRepository(adapter),
     idempotency: new BlobIdempotencyStore({ adapter }),
+    bus,
+    recorder,
+    analytics: new AnalyticsQueries(events),
   };
   return cached;
 }

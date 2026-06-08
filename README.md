@@ -118,7 +118,8 @@ The merchant console deploys as a Vite static SPA, with Vercel serverless functi
 - **`GET /api/health`** — health check.
 - **`POST /api/turn`** — orchestrator turn endpoint. Runs the **real** multi-agent loop (Shopper → Merchandiser → Logistics → Guardrail → Concierge) with a demo retailer connector and the storage-backed Retention agent. Sessions persist to Vercel Blob (`sessions/{tenantId}/{id}.json`) so conversations continue across cold starts. The Concierge stub stands in for NIM until a key is configured.
 - **`POST /api/order`** — explicit-confirmation gated checkout (FR-10). The Guardrail rejects with HTTP 412 unless `confirm: true` is in the body. On approval the demo connector returns a pay link and the order is persisted to `orders/{tenantId}/{id}.json`.
-- **`POST /api/webhook`** — retailer webhook endpoint. Verifies HMAC-SHA256, maps payloads to typed `Event`s, deduplicates via `BlobIdempotencyStore`, publishes onto the internal event bus. Idempotency reservations survive cold starts (`idempotency/{tenantId}::{event_id}.json` in Blob).
+- **`POST /api/webhook`** — retailer webhook endpoint. Verifies HMAC-SHA256, maps payloads to typed `Event`s, deduplicates via `BlobIdempotencyStore`, publishes onto the internal event bus (shared with the analytics recorder). Idempotency reservations survive cold starts.
+- **`GET /api/analytics`** — funnel + channel mix + demand signals + payment/fulfilment success rates aggregated from the Blob event log. `from` / `to` ISO query params optional.
 
 ### How data lands in Vercel Blob
 
@@ -162,7 +163,7 @@ curl -X POST https://<your-deploy>.vercel.app/api/turn \
 | 6.1 End-to-end commerce flow | `/api/turn` + `/api/order` | ✅ (demo connector + stub Concierge — swap for NIM + Kapruka MCP) |
 | 7.1 Personalisation store + customer controls | `@sevana/storage` + `StorageRetentionAgent` | ✅ |
 | 8.1 Widget + full-page channels | `@sevana/channels` + `/chat` route + `FloatingWidget` | ✅ (cross-site embed bundle pending) |
-| 9.x Merchant console pages | `@sevana/console` | ✅ (mocked data) |
-| 10.1 Analytics | partial in console | ⏭ pending (real wiring) |
+| 9.x Merchant console pages | `@sevana/console` | ✅ (Analytics page wired to real data; others use mocks until console-side write APIs exist) |
+| 10.1 Analytics + demand signals | `@sevana/analytics` + `/api/analytics` | ✅ |
 | 11.x Hardening | — | ⏭ pending |
 | 12.1 Staging validation | — | ⏭ pending |

@@ -16,10 +16,20 @@ export const ConversationEventSchema = BaseEventSchema.extend({
   kind: z.literal("conversation"),
   sessionId: SessionIdSchema,
   customerId: CustomerIdSchema.optional(),
+  channel: z.enum(["widget", "full-page", "mobile-sdk", "messaging-whatsapp"]).optional(),
   turnRole: z.enum(["customer", "concierge"]),
   contentLength: z.number().int().nonnegative(),
+  guardrailVerdict: z.enum(["approved", "blocked"]).optional(),
 });
 export type ConversationEvent = z.infer<typeof ConversationEventSchema>;
+
+export const DemandSignalEventSchema = BaseEventSchema.extend({
+  kind: z.literal("demand-signal"),
+  sessionId: SessionIdSchema,
+  reason: z.string(),
+  slotId: z.string().optional(),
+});
+export type DemandSignalEvent = z.infer<typeof DemandSignalEventSchema>;
 
 export const RecommendationEventSchema = BaseEventSchema.extend({
   kind: z.literal("recommendation"),
@@ -57,5 +67,6 @@ export const EventSchema = z.discriminatedUnion("kind", [
   OrderEventSchema,
   PaymentEventSchema,
   FulfilmentEventSchema,
+  DemandSignalEventSchema,
 ]);
 export type Event = z.infer<typeof EventSchema>;

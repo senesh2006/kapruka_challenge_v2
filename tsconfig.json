@@ -6,6 +6,7 @@
     { "path": "./packages/connectors" },
     { "path": "./packages/orchestrator" },
     { "path": "./packages/storage" },
+    { "path": "./packages/analytics" },
     { "path": "./packages/channels" },
     { "path": "./packages/console" }
   ]

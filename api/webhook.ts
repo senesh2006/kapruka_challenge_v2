@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import {
-  InMemoryEventBus,
   KaprukaWebhookMapper,
   WebhookReceiver,
 } from "@sevana/connectors";
@@ -24,16 +23,15 @@ import { bootstrap } from "./_lib.js";
  * default; we re-stringify deterministically for the HMAC check).
  */
 
-let bus: InMemoryEventBus | null = null;
 let receiver: WebhookReceiver | null = null;
 
 async function getReceiver(): Promise<WebhookReceiver | null> {
   const secret = process.env.WEBHOOK_SECRET;
   if (!secret) return null;
-  if (receiver && bus) return receiver;
-  bus = new InMemoryEventBus();
-  // In production: subscribe analytics + retention here.
-  const { idempotency } = await bootstrap();
+  if (receiver) return receiver;
+  const { idempotency, bus } = await bootstrap();
+  // bus is shared with the analytics recorder; webhook events flow straight
+  // into the analytics log.
   receiver = new WebhookReceiver({
     bus,
     idempotency,
