@@ -1,42 +1,97 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import {
+  InMemoryEventBus,
+  KaprukaWebhookMapper,
+  WebhookReceiver,
+} from "@sevana/connectors";
+import { TenantIdSchema } from "@sevana/shared";
+import { bootstrap } from "./_lib.js";
 
 /**
- * Retailer webhook endpoint (order / payment / fulfilment events).
+ * Retailer webhook endpoint.
  *
- * Vercel parses JSON bodies automatically. For signature verification we need
- * the *raw* body, so this handler re-stringifies the parsed body deterministically.
- * Production wires this into @sevana/connectors/webhooks → WebhookReceiver,
- * which does signature verification, idempotency, mapping to typed Event, and
- * publishes to the internal event bus.
+ *  POST /api/webhook
+ *  Header: x-kapruka-signature (HMAC-SHA256 of the raw body, hex)
+ *  Body: { event_id, event_type, occurred_at, order_ref, session_ref? }
  *
- * Set WEBHOOK_SECRET in the Vercel env so the signature check works in the
- * scaffold deployment.
+ * Verifies the signature, maps the payload to a typed Event in the shared
+ * model, attaches the tenantId, and publishes onto the internal event bus.
+ * Idempotency is persisted in Vercel Blob so a re-delivered webhook is not
+ * double-counted even across serverless cold starts.
+ *
+ * Required env: WEBHOOK_SECRET.
+ * Body is read raw from the request stream (Vercel parses it as JSON by
+ * default; we re-stringify deterministically for the HMAC check).
  */
+
+let bus: InMemoryEventBus | null = null;
+let receiver: WebhookReceiver | null = null;
+
+async function getReceiver(): Promise<WebhookReceiver | null> {
+  const secret = process.env.WEBHOOK_SECRET;
+  if (!secret) return null;
+  if (receiver && bus) return receiver;
+  bus = new InMemoryEventBus();
+  // In production: subscribe analytics + retention here.
+  const { idempotency } = await bootstrap();
+  receiver = new WebhookReceiver({
+    bus,
+    idempotency,
+    mapper: new KaprukaWebhookMapper(),
+    secretResolver: { resolve: async () => secret },
+  });
+  return receiver;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (req.method !== "POST") {
     res.status(405).json({ error: "method not allowed" });
     return;
   }
-
-  const secret = process.env.WEBHOOK_SECRET;
-  if (!secret) {
+  const r = await getReceiver();
+  if (!r) {
     res.status(503).json({ error: "WEBHOOK_SECRET not configured" });
     return;
   }
 
-  const provided = String(req.headers["x-kapruka-signature"] ?? "");
-  const raw = JSON.stringify(req.body ?? {});
-  const expected = createHmac("sha256", secret).update(raw, "utf8").digest("hex");
-
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) {
-    res.status(401).json({ error: "signature mismatch" });
-    return;
+  const rawBody = JSON.stringify(req.body ?? {});
+  const headers: Record<string, string> = {};
+  for (const [k, v] of Object.entries(req.headers)) {
+    if (typeof v === "string") headers[k] = v;
   }
+  const tenantHeader = req.headers["x-tenant-id"];
+  const tenantId = TenantIdSchema.parse(
+    typeof tenantHeader === "string" ? tenantHeader : "kapruka",
+  );
 
-  // Scaffold acks. Production calls WebhookReceiver.handle(...) here and the
-  // event lands on the internal bus.
-  res.status(202).json({ status: "accepted-stub" });
+  try {
+    const outcome = await r.handle({ tenantId, rawBody, headers });
+    if (outcome.status === "accepted") {
+      res.status(202).json({ status: "accepted", eventId: outcome.event.id });
+      return;
+    }
+    if (outcome.status === "duplicate") {
+      res.status(200).json({ status: "duplicate", eventId: outcome.eventId });
+      return;
+    }
+    // rejected
+    const map: Record<string, number> = {
+      signature: 401,
+      tenant: 403,
+      payload: 422,
+      unsupported: 422,
+      "no-event-id": 422,
+    };
+    res.status(map[outcome.code] ?? 400).json({
+      status: "rejected",
+      code: outcome.code,
+      reason: outcome.reason,
+    });
+  } catch (err) {
+    // Bus publish exhausted retries — release was already handled by the
+    // receiver, so 5xx tells the retailer to re-deliver.
+    res.status(503).json({
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }

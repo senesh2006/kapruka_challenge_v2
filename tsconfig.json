@@ -5,6 +5,7 @@
     { "path": "./packages/model-gateway" },
     { "path": "./packages/connectors" },
     { "path": "./packages/orchestrator" },
+    { "path": "./packages/storage" },
     { "path": "./packages/channels" },
     { "path": "./packages/console" }
   ]

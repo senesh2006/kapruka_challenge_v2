@@ -19,6 +19,13 @@
     "typecheck": "pnpm -r typecheck",
     "clean": "pnpm -r exec rm -rf dist node_modules .turbo"
   },
+  "dependencies": {
+    "@sevana/connectors": "workspace:*",
+    "@sevana/orchestrator": "workspace:*",
+    "@sevana/shared": "workspace:*",
+    "@sevana/storage": "workspace:*",
+    "@vercel/blob": "^0.23.0"
+  },
   "devDependencies": {
     "@types/node": "^20.11.30",
     "@typescript-eslint/eslint-plugin": "^7.4.0",

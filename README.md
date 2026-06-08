@@ -99,23 +99,37 @@ The merchant console deploys as a Vite static SPA, with Vercel serverless functi
 1. Push the repo to GitHub (already done if you're reading this).
 2. In Vercel, **Import Project** → pick `senesh2006/kapruka_challenge_v2`.
 3. Vercel auto-detects pnpm via `packageManager` in `package.json`. The `vercel.json` already specifies:
-   - **Build command:** `pnpm --filter @sevana/console build`
+   - **Build command:** builds every workspace package the API routes need (shared, connectors, orchestrator, storage) then the console SPA.
    - **Output directory:** `packages/console/dist`
    - **SPA fallback:** any non-`/api/`, non-`/assets/` path serves `index.html` (React Router).
-4. Set environment variables in Vercel (Project Settings → Environment Variables):
+4. Add a **Vercel Blob store** to the project (Storage → Create → Blob). Vercel injects `BLOB_READ_WRITE_TOKEN` automatically.
+5. Set environment variables in Vercel (Project Settings → Environment Variables):
 
 | Variable | Used by | Notes |
 |---|---|---|
+| `BLOB_READ_WRITE_TOKEN` | all storage paths | Auto-injected when a Blob store is linked. Without it, the API falls back to in-memory storage so previews still respond. |
 | `WEBHOOK_SECRET` | `/api/webhook` | HMAC-SHA256 secret used to verify retailer webhooks. |
-| `NIM_API_KEY` *(prod)* | `/api/turn` (when wired) | Per-tenant NVIDIA NIM key. The scaffold stub doesn't use this. |
-| `KAPRUKA_MCP_BASE_URL` *(prod)* | `/api/turn` (when wired) | Kapruka MCP base URL for the connector. |
+| `NIM_API_KEY` *(future)* | `/api/turn` (when Concierge wires NIM) | Per-tenant NVIDIA NIM key for the reasoning model. |
+| `KAPRUKA_MCP_BASE_URL` *(future)* | `/api/turn` (when Kapruka connector replaces the demo) | Kapruka MCP base URL. |
 
 ### What deploys
 
 - **Static SPA** at `/` — full merchant console with seven routed pages.
 - **`GET /api/health`** — health check.
-- **`POST /api/turn`** — orchestrator turn endpoint. Currently a **scaffold stub** that returns a canned reply matching the `TurnResult` shape. Production wires in `@sevana/orchestrator` with the six agents + the Kapruka connector + the NIM model gateway.
-- **`POST /api/webhook`** — retailer webhook endpoint. Signature-verifies the HMAC-SHA256 header and returns 202. Production wires in `@sevana/connectors/webhooks` → `WebhookReceiver`.
+- **`POST /api/turn`** — orchestrator turn endpoint. Runs the **real** multi-agent loop (Shopper → Merchandiser → Logistics → Guardrail → Concierge) with a demo retailer connector and the storage-backed Retention agent. Sessions persist to Vercel Blob (`sessions/{tenantId}/{id}.json`) so conversations continue across cold starts. The Concierge stub stands in for NIM until a key is configured.
+- **`POST /api/order`** — explicit-confirmation gated checkout (FR-10). The Guardrail rejects with HTTP 412 unless `confirm: true` is in the body. On approval the demo connector returns a pay link and the order is persisted to `orders/{tenantId}/{id}.json`.
+- **`POST /api/webhook`** — retailer webhook endpoint. Verifies HMAC-SHA256, maps payloads to typed `Event`s, deduplicates via `BlobIdempotencyStore`, publishes onto the internal event bus. Idempotency reservations survive cold starts (`idempotency/{tenantId}::{event_id}.json` in Blob).
+
+### How data lands in Vercel Blob
+
+| Prefix | Owner | Lifecycle |
+|---|---|---|
+| `tenants/{id}.json` | `TenantRepository` | Written when a tenant is provisioned. |
+| `sessions/{tenantId}/{id}.json` | `SessionRepository` | One blob per session; updated on every turn with the appended transcript. |
+| `customers/{tenantId}/{id}.json` | `CustomerProfileRepository` | Consent-gated (memoryOptIn). `delete` exposed for FR-14. |
+| `events/{tenantId}/{id}.json` | `EventRepository` | Append-only log for analytics. |
+| `orders/{tenantId}/{id}.json` | `OrderRepository` | Written by `/api/order` after the Guardrail approves. |
+| `idempotency/{tenantId}::{event_id}.json` | `BlobIdempotencyStore` | Webhook dedup; tryReserve / commit / release. |
 
 ### Local Vercel build
 
@@ -145,8 +159,8 @@ curl -X POST https://<your-deploy>.vercel.app/api/turn \
 | 3.1 NIM client + model router + fallback | `@sevana/model-gateway` | ✅ |
 | 4.1 Orchestrator + multi-agent loop | `@sevana/orchestrator` | ✅ |
 | 5.1–5.6 The six agents (interfaces + stub impls) | `@sevana/orchestrator/agents` | ✅ |
-| 6.1 End-to-end commerce flow | — | ⏭ pending |
-| 7.1 Personalisation store | — | ⏭ pending |
+| 6.1 End-to-end commerce flow | `/api/turn` + `/api/order` | ✅ (demo connector + stub Concierge — swap for NIM + Kapruka MCP) |
+| 7.1 Personalisation store + customer controls | `@sevana/storage` + `StorageRetentionAgent` | ✅ |
 | 8.1 Widget + full-page channels | `@sevana/channels` | ⏭ pending |
 | 9.x Merchant console pages | `@sevana/console` | ✅ (mocked data) |
 | 10.1 Analytics | partial in console | ⏭ pending (real wiring) |
