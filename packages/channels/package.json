@@ -7,6 +7,7 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": "./dist/index.js",
+    "./client": "./dist/client/index.js",
     "./widget": "./dist/widget/index.js",
     "./full-page": "./dist/full-page/index.js",
     "./mobile-sdk": "./dist/mobile-sdk/index.js",
@@ -19,6 +20,7 @@
   },
   "dependencies": {
     "@sevana/shared": "workspace:*",
-    "@sevana/orchestrator": "workspace:*"
+    "@sevana/orchestrator": "workspace:*",
+    "zod": "^3.22.4"
   }
 }

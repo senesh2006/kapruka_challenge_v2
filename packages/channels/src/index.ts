@@ -1,3 +1,4 @@
+export * from "./client/index.js";
 export * from "./widget/index.js";
 export * from "./full-page/index.js";
 export * from "./mobile-sdk/index.js";

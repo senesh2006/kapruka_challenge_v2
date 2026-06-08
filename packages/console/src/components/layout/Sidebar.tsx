@@ -7,6 +7,7 @@ import {
   FlaskConical,
   MessagesSquare,
   LineChart,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "../../lib/cn.js";
 
@@ -17,6 +18,7 @@ const nav: ReadonlyArray<{
   end?: boolean;
 }> = [
   { to: "/", label: "Overview", icon: LayoutDashboard, end: true },
+  { to: "/chat", label: "Try Hari", icon: MessageCircle },
   { to: "/persona", label: "Persona Studio", icon: Sparkles },
   { to: "/merchandising", label: "Merchandising", icon: ListChecks },
   { to: "/guardrails", label: "Guardrails", icon: ShieldCheck },

@@ -11,6 +11,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@sevana/channels": "workspace:*",
     "@sevana/shared": "workspace:*",
     "clsx": "^2.1.0",
     "lucide-react": "^0.378.0",

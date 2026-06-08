@@ -60,6 +60,9 @@ importers:
       '@sevana/shared':
         specifier: workspace:*
         version: link:../shared
+      zod:
+        specifier: ^3.22.4
+        version: 3.25.76
 
   packages/connectors:
     dependencies:
@@ -72,6 +75,9 @@ importers:
 
   packages/console:
     dependencies:
+      '@sevana/channels':
+        specifier: workspace:*
+        version: link:../channels
       '@sevana/shared':
         specifier: workspace:*
         version: link:../shared

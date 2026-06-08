@@ -161,7 +161,7 @@ curl -X POST https://<your-deploy>.vercel.app/api/turn \
 | 5.1–5.6 The six agents (interfaces + stub impls) | `@sevana/orchestrator/agents` | ✅ |
 | 6.1 End-to-end commerce flow | `/api/turn` + `/api/order` | ✅ (demo connector + stub Concierge — swap for NIM + Kapruka MCP) |
 | 7.1 Personalisation store + customer controls | `@sevana/storage` + `StorageRetentionAgent` | ✅ |
-| 8.1 Widget + full-page channels | `@sevana/channels` | ⏭ pending |
+| 8.1 Widget + full-page channels | `@sevana/channels` + `/chat` route + `FloatingWidget` | ✅ (cross-site embed bundle pending) |
 | 9.x Merchant console pages | `@sevana/console` | ✅ (mocked data) |
 | 10.1 Analytics | partial in console | ⏭ pending (real wiring) |
 | 11.x Hardening | — | ⏭ pending |
