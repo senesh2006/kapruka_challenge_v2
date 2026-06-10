@@ -34,6 +34,15 @@ Agent core and multi-agent loop. Hosts the orchestrator and the six specialised 
 
 Stub agents drive the orchestrator loop end-to-end without NIM. Production replaces the Concierge stub (and any other intelligence) with NIM-backed implementations via `@sevana/model-gateway` — the orchestrator code does not change.
 
+## Graceful degradation (NFR-5)
+
+Two enforcement layers, both surfaced as `agent.degraded` warn events:
+
+- **Agent-level** — `CatalogueShopperAgent` catches connector throws and returns empty candidates + a demand signal + `degraded`; `ConnectorLogisticsAgent` returns `{ feasible: false, notes: ["delivery info unavailable"], degraded: true }`.
+- **Orchestrator-level** — defensive wraps around `shopper.curateSlot`, `logistics.assess`, `retention.load` (degrades to anonymous), and `retention.update` (best-effort; never blocks an approved reply). Covers misbehaving custom agents too.
+
+The deliberate exception is checkout: `createOrder` failures propagate — an order request must never be silently dropped.
+
 ## Events
 
 Every stage emits a typed `StageEvent` (`turn.start`, `concierge.read`, `shopper.curate`, `shopper.demand-signal`, `merchandiser.apply`, `logistics.assess`, `guardrail.plan/reply/order`, `loop.refine`, `loop.cap-reached`, `concierge.present`, `order.created`, `turn.end`, `turn.error`). Analytics + tracing subscribe via `orchestrator.on(listener)`.

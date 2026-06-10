@@ -92,14 +92,30 @@ export class CatalogueShopperAgent implements ShopperAgent {
     slot: IntentSlot;
     brief: WorkingBrief;
     tenant: Tenant;
-  }): Promise<{ candidates: SlotCandidate[]; demandSignal?: { reason: string } }> {
-    const connector = await this.connectorFor(input.tenant);
-    const result = await connector.catalogue.searchProducts({
-      query: input.slot.description,
-      ...(input.slot.categoryHints.length > 0 ? { categoryIds: input.slot.categoryHints } : {}),
-      ...(input.brief.detectedLocale !== "tanglish" ? { locale: input.brief.detectedLocale } : {}),
-      limit: 8,
-    });
+  }): Promise<{
+    candidates: SlotCandidate[];
+    demandSignal?: { reason: string };
+    degraded?: { reason: string };
+  }> {
+    let result;
+    try {
+      const connector = await this.connectorFor(input.tenant);
+      result = await connector.catalogue.searchProducts({
+        query: input.slot.description,
+        ...(input.slot.categoryHints.length > 0 ? { categoryIds: input.slot.categoryHints } : {}),
+        ...(input.brief.detectedLocale !== "tanglish" ? { locale: input.brief.detectedLocale } : {}),
+        limit: 8,
+      });
+    } catch (err) {
+      // Connector outage degrades to "nothing found" rather than killing the
+      // turn (NFR-5). The gap still registers as a demand signal, and the
+      // degradation is surfaced so observability sees the outage.
+      return {
+        candidates: [],
+        demandSignal: { reason: input.slot.description },
+        degraded: { reason: err instanceof Error ? err.message : String(err) },
+      };
+    }
     if (result.items.length === 0) {
       // Demand signal: catalogue gap (FR for shopper agent — emit for analytics).
       return { candidates: [], demandSignal: { reason: input.slot.description } };
@@ -129,20 +145,32 @@ export class ConnectorLogisticsAgent implements LogisticsAgent {
     if (!destination) {
       return { destination: "", feasible: false, perishableWarnings: [], notes: ["destination not yet known"] };
     }
-    const connector = await this.connectorFor(input.tenant);
-    const date = input.brief.occasionDate ?? new Date().toISOString();
-    const quote = await connector.delivery.checkDelivery(
-      destination,
-      date,
-      input.cartSnapshot.map((c) => ({ productId: c.productId as never, quantity: c.quantity })),
-    );
-    return {
-      destination,
-      ...(quote.earliestDate !== undefined ? { earliestDate: quote.earliestDate } : {}),
-      feasible: quote.available,
-      perishableWarnings: quote.perishableWarnings,
-      notes: quote.reason ? [quote.reason] : [],
-    };
+    try {
+      const connector = await this.connectorFor(input.tenant);
+      const date = input.brief.occasionDate ?? new Date().toISOString();
+      const quote = await connector.delivery.checkDelivery(
+        destination,
+        date,
+        input.cartSnapshot.map((c) => ({ productId: c.productId as never, quantity: c.quantity })),
+      );
+      return {
+        destination,
+        ...(quote.earliestDate !== undefined ? { earliestDate: quote.earliestDate } : {}),
+        feasible: quote.available,
+        perishableWarnings: quote.perishableWarnings,
+        notes: quote.reason ? [quote.reason] : [],
+      };
+    } catch {
+      // Delivery connector outage: better to admit we can't confirm than to
+      // guess a date or block the whole turn (NFR-5).
+      return {
+        destination,
+        feasible: false,
+        perishableWarnings: [],
+        notes: ["delivery info unavailable"],
+        degraded: true,
+      };
+    }
   }
 }
 

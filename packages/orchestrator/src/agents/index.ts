@@ -46,7 +46,12 @@ export interface ShopperAgent {
     slot: IntentSlot;
     brief: WorkingBrief;
     tenant: Tenant;
-  }): Promise<{ candidates: SlotCandidate[]; demandSignal?: { reason: string } }>;
+  }): Promise<{
+    candidates: SlotCandidate[];
+    demandSignal?: { reason: string };
+    /** Set when the result is a fallback because the connector failed (NFR-5). */
+    degraded?: { reason: string };
+  }>;
 }
 
 /** 5.3 Logistics — resolves destination, checks delivery, flags perishables. */

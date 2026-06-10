@@ -13,6 +13,7 @@ export type StageEventKind =
   | "guardrail.order"
   | "loop.refine"
   | "loop.cap-reached"
+  | "agent.degraded"
   | "concierge.present"
   | "order.created"
   | "turn.end"

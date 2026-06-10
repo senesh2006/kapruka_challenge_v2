@@ -53,6 +53,8 @@ export interface DeliveryAssessment {
   feasible: boolean;
   perishableWarnings: string[];
   notes: string[];
+  /** True when the assessment is a fallback because the connector failed (NFR-5). */
+  degraded?: boolean;
 }
 
 export interface CandidatePlan {

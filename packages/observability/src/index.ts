@@ -194,6 +194,7 @@ const STAGE_LEVEL: Partial<Record<StageEvent["kind"], LogLevel>> = {
   "turn.end": "info",
   "turn.error": "error",
   "loop.cap-reached": "warn",
+  "agent.degraded": "warn",
   "guardrail.plan": "info",
   "guardrail.reply": "info",
   "guardrail.order": "info",

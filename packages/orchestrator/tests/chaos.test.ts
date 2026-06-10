@@ -2,10 +2,12 @@
  * Chaos tests — confirm NFR-4 / NFR-5: every external dependency has a
  * defined fallback so no single dependency can break the experience.
  *
- * We disable each dependency in turn and assert that the orchestrator
- * (a) still produces a structured reply or a typed error, and
- * (b) never throws an unhandled exception in the recorder / retention path
- *     when those persistence layers are unreachable.
+ * Each test disables one dependency and asserts graceful degradation:
+ * the turn still completes with an approved (honest) reply, the failure
+ * surfaces as an `agent.degraded` warning for observability, and no
+ * invented facts leak into the plan. The one deliberate exception is
+ * checkout: order-creation failures MUST surface to the caller rather
+ * than be silently swallowed.
  */
 import { describe, expect, it } from "vitest";
 import { SessionSchema, TenantSchema, type Session, type Tenant } from "@sevana/shared";
@@ -112,7 +114,7 @@ function build(opts: { connector: RetailerConnector }) {
 // ---------------- catalogue connector outage ----------------
 
 describe("chaos: catalogue connector outage", () => {
-  it("returns the loop.cap-reached event and a graceful reply when search fails for every slot", async () => {
+  it("degrades gracefully when search throws: approved honest reply, demand signal, degraded warning, no invented items", async () => {
     const broken: RetailerConnector = {
       ...workingConnector(),
       catalogue: {
@@ -126,16 +128,20 @@ describe("chaos: catalogue connector outage", () => {
       },
     };
     const o = build({ connector: broken });
-    await expect(
-      o.handleTurn({
-        session: session(),
-        tenant: tenant(),
-        customerMessage: "Birthday cake",
-      }),
-    ).rejects.toThrow(/outage/);
-    // Today's behaviour: a hard throw inside the Shopper propagates. PRD
-    // hardening will replace this with a tolerant retry + degrade-to-message
-    // (NFR-5) — this test pins current behaviour so the change is visible.
+    const events: string[] = [];
+    o.on((e) => events.push(e.kind));
+
+    const result = await o.handleTurn({
+      session: session(),
+      tenant: tenant(),
+      customerMessage: "Birthday cake",
+    });
+
+    expect(result.guardrailVerdict).toBe("approved");
+    expect(result.cardRefs).toEqual([]); // no invented items (FR-4)
+    expect(events).toContain("agent.degraded");
+    expect(events).toContain("shopper.demand-signal");
+    expect(events).toContain("loop.cap-reached");
   });
 
   it("when search returns empty (graceful outage shape), the orchestrator caps the loop and emits a demand signal", async () => {
@@ -197,10 +203,10 @@ describe("chaos: delivery connector outage", () => {
     expect(result.plan.delivery?.feasible).toBe(false);
   });
 
-  it("when checkDelivery does fire and throws, the turn surfaces a turn.error event before propagating", async () => {
-    // Build a logistics agent that always probes the connector, regardless
-    // of brief shape — this is what a future smarter Concierge will trigger
-    // (it'll fill in a destination most of the time).
+  it("when checkDelivery does fire and throws, the orchestrator degrades to an honest 'can't confirm' assessment", async () => {
+    // A logistics agent that always probes the connector and lets the throw
+    // escape — exercising the orchestrator's defensive wrap rather than the
+    // agent's internal catch.
     const broken: RetailerConnector = {
       ...workingConnector(),
       delivery: {
@@ -225,14 +231,58 @@ describe("chaos: delivery connector outage", () => {
     const events: string[] = [];
     o.on((e) => events.push(e.kind));
 
-    await expect(
-      o.handleTurn({
-        session: session(),
-        tenant: tenant(),
-        customerMessage: "Cake",
+    const result = await o.handleTurn({
+      session: session(),
+      tenant: tenant(),
+      customerMessage: "Cake",
+    });
+    expect(result.guardrailVerdict).toBe("approved");
+    expect(result.plan.delivery?.feasible).toBe(false);
+    expect(result.plan.delivery?.notes).toContain("delivery info unavailable");
+    expect(events).toContain("agent.degraded");
+    expect(events).not.toContain("turn.error");
+  });
+
+  it("the agent's own internal catch also degrades (connector throws, agent returns degraded assessment)", async () => {
+    const broken: RetailerConnector = {
+      ...workingConnector(),
+      delivery: {
+        kind: "delivery",
+        adapter: "stub",
+        listDeliveryCities: async () => [],
+        checkDelivery: async () => {
+          throw new Error("delivery outage");
+        },
+      },
+    };
+    const o = build({ connector: broken });
+    // Inject a destination so ConnectorLogisticsAgent actually calls the connector.
+    const withDestinationConcierge = {
+      read: async (input: { message: string }) => ({
+        brief: {
+          situation: input.message,
+          detectedLocale: "en" as const,
+          destination: "Kandy",
+          slots: [{ id: "primary", description: input.message, categoryHints: [], required: true }],
+        },
       }),
-    ).rejects.toThrow(/delivery outage/);
-    expect(events).toContain("turn.error");
+      present: async () => ({ reply: "ok", cardRefs: [] }),
+    };
+    (o as unknown as { agents: { concierge: typeof withDestinationConcierge } }).agents.concierge =
+      withDestinationConcierge;
+
+    const events: string[] = [];
+    o.on((e) => events.push(e.kind));
+
+    const result = await o.handleTurn({
+      session: session(),
+      tenant: tenant(),
+      customerMessage: "Cake to Kandy",
+    });
+    expect(result.guardrailVerdict).toBe("approved");
+    expect(result.plan.delivery?.feasible).toBe(false);
+    expect(result.plan.delivery?.degraded).toBe(true);
+    expect(events).toContain("agent.degraded");
   });
 });
 
@@ -269,9 +319,8 @@ describe("chaos: checkout connector outage on createOrder", () => {
 // ---------------- retention storage outage ----------------
 
 describe("chaos: retention storage outage", () => {
-  it("when retention.load throws, the orchestrator still produces an approved reply (degrades to anonymous)", async () => {
+  it("when retention.load throws, the turn degrades to an anonymous experience and still approves", async () => {
     const o = build({ connector: workingConnector() });
-    // Replace the retention agent with one that throws on load.
     const broken = {
       load: async () => {
         throw new Error("blob outage");
@@ -280,18 +329,21 @@ describe("chaos: retention storage outage", () => {
     };
     (o as unknown as { agents: { retention: typeof broken } }).agents.retention = broken;
 
-    await expect(
-      o.handleTurn({
-        session: session(),
-        tenant: tenant(),
-        customerMessage: "Cake",
-      }),
-    ).rejects.toThrow(/blob outage/);
-    // Pins current behaviour: retention.load failure propagates. Hardening
-    // would swap retention.load to return null on errors (PRD NFR-5).
+    const events: string[] = [];
+    o.on((e) => events.push(e.kind));
+
+    const result = await o.handleTurn({
+      session: session(),
+      tenant: tenant(),
+      customerMessage: "Cake",
+    });
+    expect(result.guardrailVerdict).toBe("approved");
+    expect(result.cardRefs).toContain("kap-cake");
+    expect(events).toContain("agent.degraded");
+    expect(events).not.toContain("turn.error");
   });
 
-  it("when retention.update throws, the turn has already succeeded — write failures must not block the reply", async () => {
+  it("when retention.update throws after guardrail approval, the reply still ships — persistence is best-effort", async () => {
     const o = build({ connector: workingConnector() });
     const calls: string[] = [];
     const semiBroken = {
@@ -303,17 +355,17 @@ describe("chaos: retention storage outage", () => {
     };
     (o as unknown as { agents: { retention: typeof semiBroken } }).agents.retention = semiBroken;
 
-    // The orchestrator's retention.update is called AFTER guardrail approval,
-    // so a write failure surfaces as a thrown error from handleTurn. Production
-    // hardening should isolate writes in a fire-and-forget.
-    await expect(
-      o.handleTurn({
-        session: session(),
-        tenant: tenant(),
-        customerMessage: "Cake",
-      }),
-    ).rejects.toThrow(/blob outage/);
+    const events: string[] = [];
+    o.on((e) => events.push(e.kind));
+
+    const result = await o.handleTurn({
+      session: session(),
+      tenant: tenant(),
+      customerMessage: "Cake",
+    });
+    expect(result.guardrailVerdict).toBe("approved");
     expect(calls).toEqual(["update"]);
+    expect(events).toContain("agent.degraded");
   });
 });
 

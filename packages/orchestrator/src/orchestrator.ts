@@ -94,8 +94,14 @@ export class Orchestrator {
 
     try {
       // 1. Retention — load consented profile (if any) for personalisation.
+      // Storage failure degrades to an anonymous experience (PRD §8, NFR-5).
       const profileStart = Date.now();
-      const profile = await this.agents.retention.load({ session: input.session, tenant: input.tenant });
+      let profile = null;
+      try {
+        profile = await this.agents.retention.load({ session: input.session, tenant: input.tenant });
+      } catch (err) {
+        emit("agent.degraded", 0, undefined, { agent: "retention", op: "load" }, errorMessage(err));
+      }
       emit("retention.load", 0, Date.now() - profileStart, { hasProfile: profile !== null });
 
       // 2. Concierge — read situation into a working brief.
@@ -173,13 +179,19 @@ export class Orchestrator {
         };
       }
 
-      // 7. Retention — write back consented updates.
-      const profile2 = await this.agents.retention.load({ session: input.session, tenant: input.tenant });
-      await this.agents.retention.update({
-        session: input.session,
-        plan,
-        ...(profile2 ? { profile: profile2 } : {}),
-      });
+      // 7. Retention — write back consented updates. Persistence is
+      // best-effort: a storage failure here must never block the reply the
+      // guardrail already approved (NFR-5).
+      try {
+        const profile2 = await this.agents.retention.load({ session: input.session, tenant: input.tenant });
+        await this.agents.retention.update({
+          session: input.session,
+          plan,
+          ...(profile2 ? { profile: profile2 } : {}),
+        });
+      } catch (err) {
+        emit("agent.degraded", round, undefined, { agent: "retention", op: "update" }, errorMessage(err));
+      }
 
       emit("turn.end", round, Date.now() - startedAt);
       return {
@@ -242,10 +254,25 @@ export class Orchestrator {
     for (const slotId of slotIds) {
       const slot = brief.slots.find((s) => s.id === slotId);
       if (!slot) continue;
-      const result = await this.agents.shopper.curateSlot({ slot, brief, tenant });
+      // Defensive wrap: a throwing Shopper degrades to an empty slot +
+      // demand signal instead of killing the turn (NFR-5). Well-behaved
+      // agents catch internally and return `degraded` themselves.
+      let result;
+      try {
+        result = await this.agents.shopper.curateSlot({ slot, brief, tenant });
+      } catch (err) {
+        result = {
+          candidates: [],
+          demandSignal: { reason: slot.description },
+          degraded: { reason: errorMessage(err) },
+        };
+      }
       candidatesBySlot[slot.id] = result.candidates;
       if (result.demandSignal) {
         emit("shopper.demand-signal", round, undefined, { slotId: slot.id, reason: result.demandSignal.reason });
+      }
+      if (result.degraded) {
+        emit("agent.degraded", round, undefined, { agent: "shopper", slotId: slot.id }, result.degraded.reason);
       }
     }
     emit("shopper.curate", round, Date.now() - shopperStart, { slotIds });
@@ -256,9 +283,28 @@ export class Orchestrator {
     emit("merchandiser.apply", round, Date.now() - merchStart);
 
     // c. Logistics — assess delivery against the current cart snapshot.
+    // Defensive wrap: a throwing Logistics degrades to "can't confirm" —
+    // honest unfeasibility beats invented delivery facts (NFR-5).
     const cartSnapshot = (prior.cart ?? []).map((c) => ({ productId: String(c.productId), quantity: c.quantity }));
     const logisticsStart = Date.now();
-    const delivery = await this.agents.logistics.assess({ brief, cartSnapshot, tenant });
+    let delivery;
+    let logisticsDegradeLogged = false;
+    try {
+      delivery = await this.agents.logistics.assess({ brief, cartSnapshot, tenant });
+    } catch (err) {
+      delivery = {
+        destination: brief.destination ?? "",
+        feasible: false,
+        perishableWarnings: [],
+        notes: ["delivery info unavailable"],
+        degraded: true,
+      };
+      emit("agent.degraded", round, undefined, { agent: "logistics" }, errorMessage(err));
+      logisticsDegradeLogged = true;
+    }
+    if (delivery.degraded && !logisticsDegradeLogged) {
+      emit("agent.degraded", round, undefined, { agent: "logistics" }, delivery.notes.join("; "));
+    }
     emit("logistics.assess", round, Date.now() - logisticsStart, { feasible: delivery.feasible });
 
     return {
