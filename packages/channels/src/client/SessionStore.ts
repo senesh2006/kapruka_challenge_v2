@@ -1,12 +1,13 @@
 /**
  * Persists the session id across page loads so a customer can refresh and
- * continue the same conversation. Uses sessionStorage in the browser; tests
- * inject the in-memory variant.
+ * continue the same conversation. The interface tolerates both sync stores
+ * (browser sessionStorage) and async ones (React Native AsyncStorage) — the
+ * `ChannelClient` awaits whatever they return.
  */
 export interface SessionStore {
-  get(): string | null;
-  set(sessionId: string): void;
-  clear(): void;
+  get(): string | null | Promise<string | null>;
+  set(sessionId: string): void | Promise<void>;
+  clear(): void | Promise<void>;
 }
 
 const KEY = "sevana.sessionId";
@@ -56,6 +57,57 @@ export class InMemorySessionStore implements SessionStore {
   }
   clear(): void {
     this.value = null;
+  }
+}
+
+/**
+ * Minimal contract the React Native `@react-native-async-storage/async-storage`
+ * module satisfies — `getItem` / `setItem` / `removeItem`. Anything that
+ * matches plugs in here (UniStorage, MMKV with an adapter, plain in-memory
+ * test doubles).
+ */
+export interface AsyncStorageLike {
+  getItem(key: string): Promise<string | null>;
+  setItem(key: string, value: string): Promise<void>;
+  removeItem(key: string): Promise<void>;
+}
+
+/**
+ * SessionStore backed by an AsyncStorage-shaped backend. Used by the mobile
+ * SDK channel adapter (PRD §9 / 8.2) so a customer can come back to the app
+ * and continue the same Sevana conversation.
+ */
+export class AsyncStorageSessionStore implements SessionStore {
+  private readonly storageKey: string;
+  private readonly storage: AsyncStorageLike;
+
+  constructor(storage: AsyncStorageLike, opts: { storageKey?: string } = {}) {
+    this.storage = storage;
+    this.storageKey = opts.storageKey ?? KEY;
+  }
+
+  async get(): Promise<string | null> {
+    try {
+      return await this.storage.getItem(this.storageKey);
+    } catch {
+      return null;
+    }
+  }
+
+  async set(sessionId: string): Promise<void> {
+    try {
+      await this.storage.setItem(this.storageKey, sessionId);
+    } catch {
+      /* noop — best-effort */
+    }
+  }
+
+  async clear(): Promise<void> {
+    try {
+      await this.storage.removeItem(this.storageKey);
+    } catch {
+      /* noop */
+    }
   }
 }
 

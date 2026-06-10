@@ -64,17 +64,18 @@ export class ChannelClient {
     this.tenantId = opts.tenantId;
   }
 
-  /** Returns the session id, creating one if needed. Idempotent. */
-  ensureSessionId(): string {
-    const existing = this.sessionStore.get();
+  /** Returns the session id, creating one if needed. Idempotent. Async so
+   *  it can back an async session store (React Native AsyncStorage). */
+  async ensureSessionId(): Promise<string> {
+    const existing = await this.sessionStore.get();
     if (existing) return existing;
     const fresh = newSessionId();
-    this.sessionStore.set(fresh);
+    await this.sessionStore.set(fresh);
     return fresh;
   }
 
-  resetSession(): string {
-    this.sessionStore.clear();
+  async resetSession(): Promise<string> {
+    await this.sessionStore.clear();
     return this.ensureSessionId();
   }
 
@@ -85,7 +86,7 @@ export class ChannelClient {
   async sendTurn(message: string, opts: { signal?: AbortSignal } = {}): Promise<TurnResponse> {
     const trimmed = message.trim();
     if (!trimmed) throw new ChannelClientError("message is empty", 0, null);
-    const sessionId = this.ensureSessionId();
+    const sessionId = await this.ensureSessionId();
     const body: TurnRequest = { sessionId, message: trimmed };
 
     const response = await this.fetchImpl(this.endpoint, {

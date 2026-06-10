@@ -166,6 +166,7 @@ curl -X POST https://<your-deploy>.vercel.app/api/turn \
 | 6.1 End-to-end commerce flow | `/api/turn` + `/api/order` | ✅ (demo connector + stub Concierge — swap for NIM + Kapruka MCP) |
 | 7.1 Personalisation store + customer controls | `@sevana/storage` + `StorageRetentionAgent` | ✅ |
 | 8.1 Widget + full-page channels | `@sevana/channels` + `/chat` route + `FloatingWidget` | ✅ (cross-site embed bundle pending) |
+| 8.2 Mobile SDK + messaging adapters | `createMobileChannelClient` (AsyncStorage) + WhatsApp-style `MessagingMessage` + `mapTurnToMessages` + `MessagingProvider` interface | ✅ |
 | 9.x Merchant console pages | `@sevana/console` | ✅ (Analytics page wired to real data; others use mocks until console-side write APIs exist) |
 | 10.1 Analytics + demand signals | `@sevana/analytics` + `/api/analytics` | ✅ |
 | 11.1 Observability (tracing + structured logging) | `@sevana/observability` + `ConsoleLogger` wired into `_lib.ts` | ✅ |

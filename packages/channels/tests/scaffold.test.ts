@@ -22,6 +22,7 @@ const sampleResponse: TurnResponse = {
   sessionId: "s-test",
   reply: "Hari: here's what I'd recommend.",
   cardRefs: ["kap-cake-1"],
+  cards: [],
   guardrailVerdict: "approved",
   detectedLocale: "en",
   at: "2026-06-07T10:00:00.000Z",
@@ -105,7 +106,7 @@ describe("ChannelClient.sendTurn", () => {
     });
     await client.sendTurn("first");
     const before = store.get();
-    const fresh = client.resetSession();
+    const fresh = await client.resetSession();
     expect(fresh).not.toBe(before);
   });
 
