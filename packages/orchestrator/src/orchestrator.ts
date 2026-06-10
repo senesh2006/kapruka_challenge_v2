@@ -1,4 +1,9 @@
-import type { OrderContext, Session, Tenant } from "@sevana/shared";
+import type {
+  OrderContext,
+  RecommendedItem,
+  Session,
+  Tenant,
+} from "@sevana/shared";
 import type { OrderConfirmation, RetailerConnector } from "@sevana/connectors";
 import type {
   ConciergeAgent,
@@ -17,6 +22,7 @@ import type {
 } from "./brief/index.js";
 import { emptyPlan } from "./brief/index.js";
 import { StageEmitter } from "./events/index.js";
+import type { TryOnService } from "./visuals/index.js";
 
 export interface OrchestratorAgents {
   concierge: ConciergeAgent;
@@ -37,6 +43,9 @@ export interface OrchestratorOptions {
   maxRounds?: number;
   /** Event emitter for tracing + analytics. */
   emitter?: StageEmitter;
+  /** Optional try-on service. When set, the first card per turn is rendered
+   *  live; the rest fall back to flat catalogue images (FR-7 / NFR-3). */
+  tryOn?: TryOnService;
 }
 
 export interface TurnInput {
@@ -50,6 +59,11 @@ export interface TurnInput {
 export interface TurnResult {
   reply: string;
   cardRefs: string[];
+  /** Rich cards the channel renders alongside the reply (FR-7). The first
+   *  card is the hero (rendered live via the try-on service when configured);
+   *  later cards use the flat catalogue image. Empty when the guardrail
+   *  blocked the turn. */
+  cards: RecommendedItem[];
   plan: CandidatePlan;
   briefAfter: WorkingBrief;
   guardrailVerdict: "approved" | "blocked";
@@ -67,6 +81,7 @@ export class Orchestrator {
   private readonly critic: Critic;
   private readonly maxRounds: number;
   private readonly emitter: StageEmitter;
+  private readonly tryOn: TryOnService | undefined;
 
   constructor(opts: OrchestratorOptions) {
     this.agents = opts.agents;
@@ -74,6 +89,7 @@ export class Orchestrator {
     this.critic = opts.critic ?? briefCoverageCritic;
     this.maxRounds = Math.max(1, opts.maxRounds ?? 3);
     this.emitter = opts.emitter ?? new StageEmitter();
+    this.tryOn = opts.tryOn;
   }
 
   /** Subscribe to stage events for tracing or analytics. */
@@ -143,6 +159,7 @@ export class Orchestrator {
         return {
           reply: `[blocked by guardrail: ${planVerdict.reason}]`,
           cardRefs: [],
+          cards: [],
           plan,
           briefAfter: brief,
           guardrailVerdict: "blocked",
@@ -172,12 +189,19 @@ export class Orchestrator {
         return {
           reply: `[blocked by guardrail: ${replyVerdict.reason}]`,
           cardRefs: presented.cardRefs,
+          cards: [],
           plan,
           briefAfter: brief,
           guardrailVerdict: "blocked",
           events: round,
         };
       }
+
+      // 6b. Render rich cards for the channel. Hero is rendered live via the
+      // try-on service; others use the flat catalogue image (NFR-3 latency
+      // budget). On render failure, fall back to the flat image and emit a
+      // degraded warning so observability sees it (FR-7 / NFR-5).
+      const cards = await this.renderCards(plan, input.tenant.persona, brief.detectedLocale, round, emit);
 
       // 7. Retention — write back consented updates. Persistence is
       // best-effort: a storage failure here must never block the reply the
@@ -197,6 +221,7 @@ export class Orchestrator {
       return {
         reply: presented.reply,
         cardRefs: presented.cardRefs,
+        cards,
         plan,
         briefAfter: brief,
         guardrailVerdict: "approved",
@@ -313,6 +338,56 @@ export class Orchestrator {
       delivery,
       cart: prior.cart,
     };
+  }
+
+  /**
+   * Build the rich cards the channel renders alongside the reply (FR-7).
+   * The first card per turn is the hero — rendered live via the try-on
+   * service (NFR-3 caps live rendering to one image). Later cards use the
+   * flat catalogue image. On render failure: fall back to the flat image,
+   * mark `renderDegraded: true`, and emit `agent.degraded` (NFR-5).
+   */
+  private async renderCards(
+    plan: CandidatePlan,
+    persona: Tenant["persona"],
+    locale: import("@sevana/shared").Locale,
+    round: number,
+    emit: ReturnType<typeof makeEmit>,
+  ): Promise<RecommendedItem[]> {
+    const topPerSlot: SlotCandidate[] = [];
+    for (const slotId of Object.keys(plan.candidatesBySlot)) {
+      const first = plan.candidatesBySlot[slotId]?.[0];
+      if (first) topPerSlot.push(first);
+    }
+    const cards: RecommendedItem[] = [];
+    for (let i = 0; i < topPerSlot.length; i += 1) {
+      const c = topPerSlot[i]!;
+      const isHero = i === 0;
+      const card: RecommendedItem = {
+        productId: c.product.id,
+        title: c.product.title,
+        imageUrl: c.product.imageUrl,
+        price: c.product.price,
+        reason: c.reason,
+        slotId: c.slotId,
+        isHero,
+      };
+      if (isHero && this.tryOn) {
+        try {
+          const rendered = await this.tryOn.render({
+            product: c.product,
+            persona,
+            locale,
+          });
+          card.renderUrl = rendered.url;
+        } catch (err) {
+          card.renderDegraded = true;
+          emit("agent.degraded", round, undefined, { agent: "try-on", slotId: c.slotId }, errorMessage(err));
+        }
+      }
+      cards.push(card);
+    }
+    return cards;
   }
 }
 

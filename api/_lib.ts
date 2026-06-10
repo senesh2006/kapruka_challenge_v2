@@ -22,10 +22,13 @@ import {
   ConnectorLogisticsAgent,
   DefaultGuardrailAgent,
   NimConciergeAgent,
+  NoopTryOnService,
   Orchestrator,
   StubConciergeAgent,
+  StubTryOnService,
   TenantRulesMerchandiserAgent,
   type ConciergeAgent,
+  type TryOnService,
 } from "@sevana/orchestrator";
 import {
   DEFAULT_NIM_PROFILES,
@@ -240,6 +243,19 @@ async function buildRetailerConnector(tenant: Tenant): Promise<RetailerConnector
   });
 }
 
+/**
+ * Try-on adapter selection (FR-7):
+ *   - TRY_ON_MODE=off  → NoopTryOnService (falls back to flat catalogue image)
+ *   - TRY_ON_MODE=stub → StubTryOnService (deterministic placeholder for previews)
+ *   - default          → Stub. A production deployment replaces this with a
+ *                        real on-model render backend; the same TryOnService
+ *                        interface satisfies it.
+ */
+function buildTryOnService(): TryOnService {
+  if (process.env.TRY_ON_MODE === "off") return new NoopTryOnService();
+  return new StubTryOnService();
+}
+
 export async function bootstrap() {
   if (cached) return cached;
   const adapter = await buildAdapter();
@@ -258,6 +274,7 @@ export async function bootstrap() {
     },
     connectorFor,
     maxRounds: 3,
+    tryOn: buildTryOnService(),
   });
   const events = new EventRepository(adapter);
   const bus: EventBus = new InMemoryEventBus();

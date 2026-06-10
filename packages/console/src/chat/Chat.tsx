@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Send, RefreshCcw, Sparkles, ShoppingBag } from "lucide-react";
+import {
+  AlertTriangle,
+  RefreshCcw,
+  Send,
+  ShoppingBag,
+  Sparkles,
+} from "lucide-react";
 import {
   ChannelClient,
   type ChannelKind,
   type ConversationTurn,
+  type RecommendedCard,
 } from "@sevana/channels";
 import { Button } from "../components/ui/Button.js";
 import { Badge } from "../components/ui/Badge.js";
@@ -91,6 +98,7 @@ export function Chat({
         role: "concierge",
         content: response.reply,
         cardRefs: response.cardRefs,
+        cards: response.cards,
         at: response.at,
         status: response.guardrailVerdict === "approved" ? "delivered" : "blocked",
       };
@@ -196,8 +204,9 @@ export function Chat({
 
 function Bubble({ turn }: { turn: ConversationTurn }) {
   const isCustomer = turn.role === "customer";
+  const hasRichCards = !isCustomer && turn.cards && turn.cards.length > 0;
   return (
-    <div className={cn("flex", isCustomer ? "justify-end" : "justify-start")}>
+    <div className={cn("flex flex-col", isCustomer ? "items-end" : "items-start")}>
       <div
         className={cn(
           "max-w-[80%] rounded-lg px-4 py-3 text-sm leading-relaxed",
@@ -209,7 +218,7 @@ function Bubble({ turn }: { turn: ConversationTurn }) {
         )}
       >
         <p className="whitespace-pre-wrap">{turn.content}</p>
-        {turn.cardRefs && turn.cardRefs.length > 0 ? (
+        {!hasRichCards && turn.cardRefs && turn.cardRefs.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {turn.cardRefs.map((ref) => (
               <Badge key={ref} variant="accent">
@@ -219,6 +228,13 @@ function Bubble({ turn }: { turn: ConversationTurn }) {
           </div>
         ) : null}
       </div>
+      {hasRichCards ? (
+        <div className="mt-2 grid w-[80%] gap-2 sm:grid-cols-2">
+          {turn.cards!.map((c) => (
+            <ProductCard key={String(c.productId)} card={c} />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -282,5 +298,51 @@ function EmptyState({
         ))}
       </div>
     </div>
+  );
+}
+
+function ProductCard({ card }: { card: RecommendedCard }) {
+  const imageSrc = card.renderUrl ?? card.imageUrl;
+  const isOnModel = Boolean(card.renderUrl);
+  const price = `${card.price.currency} ${card.price.amount.toLocaleString()}`;
+  return (
+    <article
+      className={cn(
+        "overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm",
+        card.isHero ? "border-primary/40 ring-1 ring-primary/20" : "border-border",
+      )}
+    >
+      <div className="relative aspect-[4/5] w-full bg-muted">
+        <img
+          src={imageSrc}
+          alt={card.title}
+          loading="lazy"
+          className="h-full w-full object-cover"
+        />
+        {card.isHero ? (
+          <span className="absolute left-2 top-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary-foreground">
+            Hero
+          </span>
+        ) : null}
+        {isOnModel && !card.renderDegraded ? (
+          <span className="absolute right-2 top-2 rounded-full bg-accent px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent-foreground">
+            On-model
+          </span>
+        ) : null}
+        {card.renderDegraded ? (
+          <span
+            className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-warning/90 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-warning-foreground"
+            title="Try-on render failed; showing the flat catalogue image"
+          >
+            <AlertTriangle className="h-3 w-3" aria-hidden /> flat
+          </span>
+        ) : null}
+      </div>
+      <div className="space-y-1 p-3">
+        <p className="text-sm font-semibold leading-tight text-foreground">{card.title}</p>
+        <p className="font-mono text-xs text-muted-foreground">{price}</p>
+        <p className="text-xs leading-snug text-foreground/80">{card.reason}</p>
+      </div>
+    </article>
   );
 }

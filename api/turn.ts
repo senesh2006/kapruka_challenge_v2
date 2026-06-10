@@ -57,6 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sessionId,
       reply: result.reply,
       cardRefs: result.cardRefs,
+      cards: result.cards,
       guardrailVerdict: result.guardrailVerdict,
       detectedLocale: result.briefAfter.detectedLocale,
       at: new Date().toISOString(),

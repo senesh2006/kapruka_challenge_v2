@@ -16,10 +16,30 @@ export const TurnRequestSchema = z.object({
 });
 export type TurnRequest = z.infer<typeof TurnRequestSchema>;
 
+export const MoneySchema = z.object({
+  amount: z.number(),
+  currency: z.string(),
+});
+export type Money = z.infer<typeof MoneySchema>;
+
+export const RecommendedCardSchema = z.object({
+  productId: z.string(),
+  title: z.string(),
+  imageUrl: z.string(),
+  price: MoneySchema,
+  reason: z.string(),
+  slotId: z.string().optional(),
+  renderUrl: z.string().optional(),
+  renderDegraded: z.boolean().optional(),
+  isHero: z.boolean().optional(),
+});
+export type RecommendedCard = z.infer<typeof RecommendedCardSchema>;
+
 export const TurnResponseSchema = z.object({
   sessionId: z.string(),
   reply: z.string(),
   cardRefs: z.array(z.string()).default([]),
+  cards: z.array(RecommendedCardSchema).default([]),
   guardrailVerdict: z.enum(["approved", "blocked"]),
   detectedLocale: z.enum(["en", "si", "ta", "tanglish"]).optional(),
   at: z.string(),
@@ -32,6 +52,7 @@ export interface ConversationTurn {
   role: "customer" | "concierge" | "system";
   content: string;
   cardRefs?: string[];
+  cards?: RecommendedCard[];
   at: string;
   status?: "pending" | "delivered" | "blocked";
 }
