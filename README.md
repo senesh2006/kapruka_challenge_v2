@@ -111,7 +111,8 @@ The merchant console deploys as a Vite static SPA, with Vercel serverless functi
 | `WEBHOOK_SECRET` | `/api/webhook` | HMAC-SHA256 secret used to verify retailer webhooks. |
 | `NIM_API_KEY` | `/api/turn` | NVIDIA NIM key. When set, the Concierge runs on NIM (`NimConciergeAgent`: tool-calling brief extraction + persona-voiced replies). When unset, the stub concierge keeps previews working. |
 | `NIM_BASE_URL` | `/api/turn` | Optional override; defaults to `https://integrate.api.nvidia.com/v1`. Point at self-hosted NIM containers for private deployments. |
-| `KAPRUKA_MCP_BASE_URL` *(future)* | `/api/turn` (when Kapruka connector replaces the demo) | Kapruka MCP base URL. |
+| `KAPRUKA_MCP_BASE_URL` | `/api/turn`, `/api/order`, `/api/connector-health` | When set, the real Kapruka MCP adapter replaces the demo connector — with the full transport stack: 60 req/min + 30 orders/hr rate limits, TTL catalogue caching, exponential backoff, Zod-validated normalisation. Wire contract: `POST {base}/tools/{toolName}` with `{ "arguments": {...} }`. |
+| `KAPRUKA_MCP_API_KEY` | same | Bearer credential for the MCP gateway. Lives inside the client closure — never exposed to channels. |
 
 ### What deploys
 
@@ -121,6 +122,7 @@ The merchant console deploys as a Vite static SPA, with Vercel serverless functi
 - **`POST /api/order`** — explicit-confirmation gated checkout (FR-10). The Guardrail rejects with HTTP 412 unless `confirm: true` is in the body. On approval the demo connector returns a pay link and the order is persisted to `orders/{tenantId}/{id}.json`.
 - **`POST /api/webhook`** — retailer webhook endpoint. Verifies HMAC-SHA256, maps payloads to typed `Event`s, deduplicates via `BlobIdempotencyStore`, publishes onto the internal event bus (shared with the analytics recorder). Idempotency reservations survive cold starts.
 - **`GET /api/analytics`** — funnel + channel mix + demand signals + payment/fulfilment success rates aggregated from the Blob event log. `from` / `to` ISO query params optional.
+- **`GET /api/connector-health`** — probes `catalogue.listCategories()` through the active connector (Kapruka MCP or demo) and reports adapter + latency. 502 carries the upstream error.
 
 ### How data lands in Vercel Blob
 

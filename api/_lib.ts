@@ -41,7 +41,10 @@ import {
   type Logger,
 } from "@sevana/observability";
 import {
+  ConnectorRegistry,
+  HttpMcpClient,
   InMemoryEventBus,
+  registerKaprukaAdapter,
   type EventBus,
   type RetailerConnector,
 } from "@sevana/connectors";
@@ -69,6 +72,7 @@ let cached: {
   recorder: AnalyticsRecorder;
   analytics: AnalyticsQueries;
   logger: Logger;
+  connector: RetailerConnector;
 } | null = null;
 
 async function buildAdapter(): Promise<BlobStorageAdapter> {
@@ -151,8 +155,14 @@ function demoConnector(): RetailerConnector {
 
 const NOW_ISO = (): string => new Date().toISOString();
 
+/** Adapter the tenant binds to: real Kapruka MCP when configured, demo otherwise. */
+function activeAdapter(): "kapruka" | "demo" {
+  return process.env.KAPRUKA_MCP_BASE_URL ? "kapruka" : "demo";
+}
+
 export function demoTenant(): Tenant {
   const now = NOW_ISO();
+  const adapter = activeAdapter();
   return TenantSchema.parse({
     id: "kapruka",
     name: "Kapruka",
@@ -169,9 +179,9 @@ export function demoTenant(): Tenant {
     merchandising: { rankingPriorities: ["in-stock-first"] },
     guardrails: {},
     connectors: [
-      { kind: "catalogue", adapter: "demo", credentialRef: "k" },
-      { kind: "delivery", adapter: "demo", credentialRef: "k" },
-      { kind: "checkout", adapter: "demo", credentialRef: "k" },
+      { kind: "catalogue", adapter, credentialRef: "k" },
+      { kind: "delivery", adapter, credentialRef: "k" },
+      { kind: "checkout", adapter, credentialRef: "k" },
     ],
     credentials: [{ ref: "k", connectorKind: "catalogue", scopes: [] }],
     createdAt: now,
@@ -201,12 +211,41 @@ function buildConcierge(): ConciergeAgent {
   return new NimConciergeAgent(gateway);
 }
 
+/**
+ * Resolve the retailer connector. With KAPRUKA_MCP_BASE_URL set, the real
+ * Kapruka MCP adapter is assembled through the ConnectorRegistry — which
+ * brings the full KaprukaTransport stack with it: 60 req/min + 30 orders/hr
+ * rate limits, TTL caching on catalogue reads, exponential backoff, and
+ * Zod-validated normalisation (PRD 2.2 / NFR-8). Credentials come from
+ * KAPRUKA_MCP_API_KEY and live inside the HttpMcpClient closure — no public
+ * surface exposes them. Without the env, the in-process demo connector keeps
+ * previews working.
+ */
+async function buildRetailerConnector(tenant: Tenant): Promise<RetailerConnector> {
+  const baseUrl = process.env.KAPRUKA_MCP_BASE_URL;
+  if (!baseUrl) return demoConnector();
+  const registry = new ConnectorRegistry();
+  registerKaprukaAdapter(registry, {
+    buildClient: (credential) =>
+      new HttpMcpClient({
+        baseUrl,
+        ...(typeof credential.apiKey === "string" ? { apiKey: credential.apiKey } : {}),
+      }),
+  });
+  const apiKey = process.env.KAPRUKA_MCP_API_KEY;
+  return registry.resolve(tenant, {
+    credentialResolver: {
+      resolve: async () => (apiKey ? { apiKey } : {}),
+    },
+  });
+}
+
 export async function bootstrap() {
   if (cached) return cached;
   const adapter = await buildAdapter();
   const customers = new CustomerProfileRepository(adapter);
   const retention = new StorageRetentionAgent(customers);
-  const connector = demoConnector();
+  const connector = await buildRetailerConnector(demoTenant());
   const connectorFor = async () => connector;
   const orchestrator = new Orchestrator({
     agents: {
@@ -238,6 +277,7 @@ export async function bootstrap() {
     blob: process.env.BLOB_READ_WRITE_TOKEN ? "vercel" : "in-memory",
     webhookSecret: process.env.WEBHOOK_SECRET ? "configured" : "missing",
     concierge: process.env.NIM_API_KEY ? "nim" : "stub",
+    connector: activeAdapter(),
   });
   cached = {
     adapter,
@@ -253,6 +293,7 @@ export async function bootstrap() {
     recorder,
     analytics: new AnalyticsQueries(events),
     logger,
+    connector,
   };
   return cached;
 }
