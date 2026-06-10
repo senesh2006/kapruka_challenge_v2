@@ -98,10 +98,10 @@ The merchant console deploys as a Vite static SPA, with Vercel serverless functi
 
 1. Push the repo to GitHub (already done if you're reading this).
 2. In Vercel, **Import Project** → pick `senesh2006/kapruka_challenge_v2`.
-3. Vercel auto-detects pnpm via `packageManager` in `package.json`. The `vercel.json` already specifies:
-   - **Build command:** builds every workspace package the API routes need (shared, connectors, orchestrator, storage) then the console SPA.
-   - **Output directory:** `packages/console/dist`
-   - **SPA fallback:** any non-`/api/`, non-`/assets/` path serves `index.html` (React Router).
+3. **Project settings that matter** (Settings → Build & Development / General):
+   - **Root Directory:** leave it at the repo root (empty). Do NOT set it to `packages/console` — the serverless functions live in the root `api/` folder and `vercel.json` is read from the root; pointing the root elsewhere silently drops both.
+   - **Framework Preset:** Other / None. (If Vercel auto-picked "Vite" during import, change it — the preset's defaults can fight the config.)
+   - Everything else comes from `vercel.json`: build command `pnpm run build:vercel` (builds every workspace package the API routes need, builds the console SPA, then copies it to a root-level `dist/`), output directory `dist`, SPA fallback rewrites for React Router.
 4. Add a **Vercel Blob store** to the project (Storage → Create → Blob). Vercel injects `BLOB_READ_WRITE_TOKEN` automatically.
 5. Set environment variables in Vercel (Project Settings → Environment Variables):
 

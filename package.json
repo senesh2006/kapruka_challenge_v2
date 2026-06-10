@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "pnpm -r build",
-    "build:vercel": "pnpm --filter @sevana/console build",
+    "build:vercel": "pnpm --filter @sevana/shared --filter @sevana/connectors --filter @sevana/model-gateway --filter @sevana/orchestrator --filter @sevana/storage --filter @sevana/analytics --filter @sevana/observability --filter @sevana/console build && rm -rf dist && cp -r packages/console/dist dist",
     "lint": "eslint \"packages/*/src/**/*.{ts,tsx}\"",
     "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,json,md}\"",
     "format:check": "prettier --check \"packages/*/src/**/*.{ts,tsx,json,md}\"",
