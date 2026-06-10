@@ -174,5 +174,6 @@ curl -X POST https://<your-deploy>.vercel.app/api/turn \
 | 6.2 Visual output + try-on fallback | `TryOnService` (Noop / Stub) + orchestrator `renderCards` + Console `ProductCard` | ✅ live hero render, flat fallback on failure, degraded badge |
 | 11.3 i18n + multi-currency | `detectLocaleFromMessage` (shared) + 32 Sri Lankan phrase / currency / vernacular tests in `i18n.test.ts` | ✅ |
 | 12.1 End-to-end staging validation | `@sevana/integration-tests/tests/staging-validation.test.ts` — walks the 8-step PRD integration checklist | ✅ |
+| 12.2 Multi-retailer generalisation | REST adapter (`@sevana/connectors/rest`) + `multi-retailer.test.ts` (two tenants, one orchestrator, full isolation) + `/api/tenants` + console Tenants page | ✅ |
 | 11.3 i18n | — | ⏭ pending |
 | 12.1 Staging validation | — | ⏭ pending |

@@ -9,6 +9,7 @@ import { GuardrailsPage } from "./pages/Guardrails.js";
 import { MerchandisingPage } from "./pages/Merchandising.js";
 import { OverviewPage } from "./pages/Overview.js";
 import { PersonaStudioPage } from "./pages/PersonaStudio.js";
+import { TenantsPage } from "./pages/Tenants.js";
 
 export function App() {
   return (
@@ -23,6 +24,7 @@ export function App() {
           <Route path="/experiments" element={<ExperimentsPage />} />
           <Route path="/conversations" element={<ConversationsPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/tenants" element={<TenantsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

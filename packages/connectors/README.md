@@ -75,6 +75,10 @@ Every MCP response is Zod-validated before reaching the orchestrator — connect
 
 A REST-backed adapter (or any other transport) implements the same four interfaces and registers itself with the registry; the orchestrator can't tell the difference.
 
+### REST adapter (PRD §12.2)
+
+`@sevana/connectors/rest` proves the contract holds beyond Kapruka: where Kapruka speaks MCP tools with snake_case payloads, this adapter speaks a conventional camelCase REST API (`GET /products?q=`, `POST /shipping/quote`, `POST /orders`, …) and normalises onto the same canonical types. `registerRestAdapter(registry, { buildClient })` mirrors `registerKaprukaAdapter` exactly — both transports register on one registry and serve different tenants side by side. The credential payload carries `baseUrl` (and optionally `apiKey`) so each REST tenant points at its own API host: all config, no code. Deliberately a contract proof, not production hardening — it has timeouts and Zod validation but no rate limiting or caching; a real second retailer would get a transport stack like `KaprukaTransport` tuned to their limits.
+
 ### Kapruka adapter
 
 `@sevana/connectors/kapruka` is the production Kapruka MCP adapter. It wires `catalogue`, `delivery`, and `checkout` (no CRM — Kapruka MCP doesn't expose CRM tools) onto a shared per-tenant `KaprukaTransport` that enforces:

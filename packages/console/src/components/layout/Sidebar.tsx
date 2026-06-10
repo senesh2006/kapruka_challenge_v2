@@ -8,6 +8,7 @@ import {
   MessagesSquare,
   LineChart,
   MessageCircle,
+  Building2,
 } from "lucide-react";
 import { cn } from "../../lib/cn.js";
 
@@ -25,6 +26,7 @@ const nav: ReadonlyArray<{
   { to: "/experiments", label: "Experiments", icon: FlaskConical },
   { to: "/conversations", label: "Conversations", icon: MessagesSquare },
   { to: "/analytics", label: "Analytics", icon: LineChart },
+  { to: "/tenants", label: "Tenants", icon: Building2 },
 ];
 
 export function Sidebar() {
