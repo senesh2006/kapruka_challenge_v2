@@ -1,9 +1,10 @@
-import type {
-  CustomerProfile,
-  Locale,
-  Persona,
-  Session,
-  Tenant,
+import {
+  detectLocaleFromMessage,
+  type CustomerProfile,
+  type Locale,
+  type Persona,
+  type Session,
+  type Tenant,
 } from "@sevana/shared";
 import type { RetailerConnector } from "@sevana/connectors";
 import type {
@@ -314,12 +315,7 @@ export const briefCoverageCritic: Critic = (plan, brief) => {
 // ---------- helpers ----------
 
 function detectLocale(message: string, persona: Persona): Locale {
-  const enabled = new Set(persona.languages);
-  const lower = message.toLowerCase();
-  if (enabled.has("tanglish") && /\b(machan|aiyo|kohomada|mage)\b/.test(lower)) return "tanglish";
-  if (enabled.has("si") && /[඀-෿]/.test(message)) return "si";
-  if (enabled.has("ta") && /[஀-௿]/.test(message)) return "ta";
-  return enabled.has("en") ? "en" : (persona.languages[0] ?? "en");
+  return detectLocaleFromMessage(message, { enabledLanguages: persona.languages });
 }
 
 function naiveSlotExtraction(message: string): IntentSlot[] {

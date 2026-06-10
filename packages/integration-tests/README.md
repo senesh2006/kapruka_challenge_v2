@@ -29,3 +29,13 @@ Real Sevana code throughout — the only fakes are the genuinely-external system
 11. **Session continuity**: refresh-equivalent read recovers the persisted session.
 
 The test is the merge gate before promoting to staging.
+
+## i18n suite (PRD §11.3)
+
+`tests/i18n.test.ts` covers internationalisation:
+
+- **Real Sri Lankan phrases** — 14 fixtures across English / Sinhala (native script) / Tamil (native script) / Tanglish (Sinhala-glish + Tamil-glish romanised). Asserts correct locale detection and that the StubConciergeAgent writes the detected locale into the working brief.
+- **Tenant-disabled languages** — detector never returns a locale the tenant did not enable; Sinhala script falls back to English when Sinhala is disabled.
+- **Multi-currency round-trip** — `Money` / `CartLine` / `OrderContext` schemas preserve LKR / USD / GBP / AUD / EUR end-to-end including JSON serialisation. Lowercase currency codes get coerced to uppercase. Invalid codes are rejected. Documents the diaspora pattern (sender pays USD, retailer charges LKR).
+- **Vernacular place names** (FR-9) — `listDeliveryCities` returns aliases (`Galu` / `Maha Nuwara` / `Yapanaya` / native-script variants), `checkDelivery` accepts the raw alias the customer typed, and the orchestrator passes `brief.destination` through unchanged so resolution stays the connector's responsibility.
+- **CustomerProfile.locale** round-trips for every supported language.

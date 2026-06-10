@@ -170,6 +170,7 @@ curl -X POST https://<your-deploy>.vercel.app/api/turn \
 | 10.1 Analytics + demand signals | `@sevana/analytics` + `/api/analytics` | ✅ |
 | 11.1 Observability (tracing + structured logging) | `@sevana/observability` + `ConsoleLogger` wired into `_lib.ts` | ✅ |
 | 11.2 Fallbacks + chaos | agent-level catches + orchestrator defensive wraps + `agent.degraded` warnings + `chaos.test.ts` (9 scenarios) | ✅ graceful degradation everywhere except checkout (which must surface) |
+| 11.3 i18n + multi-currency | `detectLocaleFromMessage` (shared) + 32 Sri Lankan phrase / currency / vernacular tests in `i18n.test.ts` | ✅ |
 | 12.1 End-to-end staging validation | `@sevana/integration-tests/tests/staging-validation.test.ts` — walks the 8-step PRD integration checklist | ✅ |
 | 11.3 i18n | — | ⏭ pending |
 | 12.1 Staging validation | — | ⏭ pending |

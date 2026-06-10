@@ -1,10 +1,11 @@
 import { z } from "zod";
-import type {
-  CustomerProfile,
-  Locale,
-  Persona,
-  Session,
-  TenantId,
+import {
+  detectLocaleFromMessage,
+  type CustomerProfile,
+  type Locale,
+  type Persona,
+  type Session,
+  type TenantId,
 } from "@sevana/shared";
 import type {
   ChatResponse,
@@ -286,11 +287,5 @@ function fallbackBrief(
 }
 
 function fallbackLocale(message: string, persona: Persona): Locale {
-  const enabled = new Set(persona.languages);
-  const lower = message.toLowerCase();
-  if (enabled.has("tanglish") && /\b(machan|aiyo|kohomada|mage|amma|thatha)\b/.test(lower))
-    return "tanglish";
-  if (enabled.has("si") && /[඀-෿]/.test(message)) return "si";
-  if (enabled.has("ta") && /[஀-௿]/.test(message)) return "ta";
-  return enabled.has("en") ? "en" : (persona.languages[0] ?? "en");
+  return detectLocaleFromMessage(message, { enabledLanguages: persona.languages });
 }
