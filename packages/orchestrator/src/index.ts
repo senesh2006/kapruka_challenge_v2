@@ -11,5 +11,6 @@ export type AgentRole =
 export * from "./brief/index.js";
 export * from "./agents/index.js";
 export * from "./agents/stubs.js";
+export * from "./agents/nim-concierge.js";
 export * from "./events/index.js";
 export * from "./orchestrator.js";

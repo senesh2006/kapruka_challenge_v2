@@ -23,9 +23,9 @@ Agent core and multi-agent loop. Hosts the orchestrator and the six specialised 
 
 ## The six agent interfaces
 
-| Role | Interface | Stub impl |
+| Role | Interface | Implementations |
 |---|---|---|
-| 5.1 Concierge | `ConciergeAgent.read` + `present` | `StubConciergeAgent` (naive language detect, single-slot extraction) |
+| 5.1 Concierge | `ConciergeAgent.read` + `present` | `NimConciergeAgent` (production — NIM tool-calling brief extraction + persona-voiced presentation, graceful fallback on gateway failure) / `StubConciergeAgent` (tests + previews) |
 | 5.2 Shopper | `ShopperAgent.curateSlot` | `CatalogueShopperAgent` (real catalogue search via the connector) |
 | 5.3 Logistics | `LogisticsAgent.assess` | `ConnectorLogisticsAgent` (real `checkDelivery`) |
 | 5.4 Merchandiser | `MerchandiserAgent.apply` | `TenantRulesMerchandiserAgent` (reads tenant config) |

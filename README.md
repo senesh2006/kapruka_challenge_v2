@@ -109,7 +109,8 @@ The merchant console deploys as a Vite static SPA, with Vercel serverless functi
 |---|---|---|
 | `BLOB_READ_WRITE_TOKEN` | all storage paths | Auto-injected when a Blob store is linked. Without it, the API falls back to in-memory storage so previews still respond. |
 | `WEBHOOK_SECRET` | `/api/webhook` | HMAC-SHA256 secret used to verify retailer webhooks. |
-| `NIM_API_KEY` *(future)* | `/api/turn` (when Concierge wires NIM) | Per-tenant NVIDIA NIM key for the reasoning model. |
+| `NIM_API_KEY` | `/api/turn` | NVIDIA NIM key. When set, the Concierge runs on NIM (`NimConciergeAgent`: tool-calling brief extraction + persona-voiced replies). When unset, the stub concierge keeps previews working. |
+| `NIM_BASE_URL` | `/api/turn` | Optional override; defaults to `https://integrate.api.nvidia.com/v1`. Point at self-hosted NIM containers for private deployments. |
 | `KAPRUKA_MCP_BASE_URL` *(future)* | `/api/turn` (when Kapruka connector replaces the demo) | Kapruka MCP base URL. |
 
 ### What deploys

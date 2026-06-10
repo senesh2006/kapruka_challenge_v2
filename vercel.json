@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm --filter @sevana/shared --filter @sevana/connectors --filter @sevana/orchestrator --filter @sevana/storage --filter @sevana/analytics --filter @sevana/observability --filter @sevana/console build",
+  "buildCommand": "pnpm --filter @sevana/shared --filter @sevana/connectors --filter @sevana/model-gateway --filter @sevana/orchestrator --filter @sevana/storage --filter @sevana/analytics --filter @sevana/observability --filter @sevana/console build",
   "outputDirectory": "packages/console/dist",
   "installCommand": "pnpm install --frozen-lockfile=false",
   "framework": null,

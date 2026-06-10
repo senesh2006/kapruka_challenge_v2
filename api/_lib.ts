@@ -21,10 +21,18 @@ import {
   CatalogueShopperAgent,
   ConnectorLogisticsAgent,
   DefaultGuardrailAgent,
+  NimConciergeAgent,
   Orchestrator,
   StubConciergeAgent,
   TenantRulesMerchandiserAgent,
+  type ConciergeAgent,
 } from "@sevana/orchestrator";
+import {
+  DEFAULT_NIM_PROFILES,
+  ModelGateway,
+  ModelRouter,
+  NimClient,
+} from "@sevana/model-gateway";
 import { AnalyticsRecorder, AnalyticsQueries } from "@sevana/analytics";
 import {
   ConsoleLogger,
@@ -171,6 +179,28 @@ export function demoTenant(): Tenant {
   });
 }
 
+/**
+ * Concierge selection: NIM-backed when NIM_API_KEY is configured, stub
+ * otherwise so previews still respond. The NIM concierge degrades to
+ * stub-equivalent behaviour internally if the gateway fails at runtime.
+ */
+function buildConcierge(): ConciergeAgent {
+  const apiKey = process.env.NIM_API_KEY;
+  if (!apiKey) return new StubConciergeAgent();
+  const router = new ModelRouter();
+  for (const profile of DEFAULT_NIM_PROFILES) router.register(profile);
+  const client = new NimClient({
+    baseUrl: process.env.NIM_BASE_URL ?? "https://integrate.api.nvidia.com/v1",
+    apiKey,
+    timeoutMs: 25_000,
+  });
+  const gateway = new ModelGateway({
+    router,
+    clientResolver: { resolve: async () => client },
+  });
+  return new NimConciergeAgent(gateway);
+}
+
 export async function bootstrap() {
   if (cached) return cached;
   const adapter = await buildAdapter();
@@ -180,7 +210,7 @@ export async function bootstrap() {
   const connectorFor = async () => connector;
   const orchestrator = new Orchestrator({
     agents: {
-      concierge: new StubConciergeAgent(),
+      concierge: buildConcierge(),
       shopper: new CatalogueShopperAgent(connectorFor),
       logistics: new ConnectorLogisticsAgent(connectorFor),
       merchandiser: new TenantRulesMerchandiserAgent(),
@@ -207,6 +237,7 @@ export async function bootstrap() {
   logger.info("sevana.bootstrap", {
     blob: process.env.BLOB_READ_WRITE_TOKEN ? "vercel" : "in-memory",
     webhookSecret: process.env.WEBHOOK_SECRET ? "configured" : "missing",
+    concierge: process.env.NIM_API_KEY ? "nim" : "stub",
   });
   cached = {
     adapter,
