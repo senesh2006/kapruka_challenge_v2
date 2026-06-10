@@ -8,6 +8,7 @@
     { "path": "./packages/storage" },
     { "path": "./packages/analytics" },
     { "path": "./packages/observability" },
+    { "path": "./packages/integration-tests" },
     { "path": "./packages/channels" },
     { "path": "./packages/console" }
   ]

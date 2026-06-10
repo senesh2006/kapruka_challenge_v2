@@ -149,6 +149,30 @@ importers:
         specifier: ^5.2.0
         version: 5.4.21(@types/node@20.19.41)
 
+  packages/integration-tests:
+    dependencies:
+      '@sevana/analytics':
+        specifier: workspace:*
+        version: link:../analytics
+      '@sevana/connectors':
+        specifier: workspace:*
+        version: link:../connectors
+      '@sevana/model-gateway':
+        specifier: workspace:*
+        version: link:../model-gateway
+      '@sevana/observability':
+        specifier: workspace:*
+        version: link:../observability
+      '@sevana/orchestrator':
+        specifier: workspace:*
+        version: link:../orchestrator
+      '@sevana/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@sevana/storage':
+        specifier: workspace:*
+        version: link:../storage
+
   packages/model-gateway:
     dependencies:
       '@sevana/shared':

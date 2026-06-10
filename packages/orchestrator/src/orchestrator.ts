@@ -139,7 +139,7 @@ export class Orchestrator {
       const planVerdict = await this.agents.guardrail.reviewPlan({ plan, tenant: input.tenant });
       emit("guardrail.plan", round, undefined, { approve: planVerdict.approve });
       if (!planVerdict.approve) {
-        emit("turn.end", round, Date.now() - startedAt);
+        emit("turn.end", round, Date.now() - startedAt, { channel: input.session.channel });
         return {
           reply: `[blocked by guardrail: ${planVerdict.reason}]`,
           cardRefs: [],
@@ -168,7 +168,7 @@ export class Orchestrator {
       });
       emit("guardrail.reply", round, undefined, { approve: replyVerdict.approve });
       if (!replyVerdict.approve) {
-        emit("turn.end", round, Date.now() - startedAt);
+        emit("turn.end", round, Date.now() - startedAt, { channel: input.session.channel });
         return {
           reply: `[blocked by guardrail: ${replyVerdict.reason}]`,
           cardRefs: presented.cardRefs,
@@ -193,7 +193,7 @@ export class Orchestrator {
         emit("agent.degraded", round, undefined, { agent: "retention", op: "update" }, errorMessage(err));
       }
 
-      emit("turn.end", round, Date.now() - startedAt);
+      emit("turn.end", round, Date.now() - startedAt, { channel: input.session.channel });
       return {
         reply: presented.reply,
         cardRefs: presented.cardRefs,

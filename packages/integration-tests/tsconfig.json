@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "rootDir": "./tests"
+  },
+  "include": ["tests/**/*"],
+  "references": [
+    { "path": "../shared" },
+    { "path": "../connectors" },
+    { "path": "../model-gateway" },
+    { "path": "../orchestrator" },
+    { "path": "../storage" },
+    { "path": "../analytics" },
+    { "path": "../observability" }
+  ]
+}
