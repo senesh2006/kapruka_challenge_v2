@@ -42,6 +42,7 @@ export const ConciergeEmotionSchema = z.enum([
   "thoughtful",
   "apologetic",
   "celebratory",
+  "condolence",
 ]);
 export type ConciergeEmotion = z.infer<typeof ConciergeEmotionSchema>;
 

@@ -290,8 +290,11 @@ describe("PRD §12.2 — multi-retailer generalisation", () => {
     });
 
     // Each tenant sees ONLY its own catalogue — no bleed in either direction.
-    expect(kapTurn.cardRefs).toEqual(["kap-cake-1"]);
-    expect(velvetTurn.cardRefs).toEqual(["VLV-THROW-01"]);
+    // (The stub concierge coordinates a small set for a birthday, so cardRefs
+    // may repeat the fake server's single product across slots — what matters
+    // is that no item from the OTHER tenant ever appears.)
+    expect(new Set(kapTurn.cardRefs)).toEqual(new Set(["kap-cake-1"]));
+    expect(new Set(velvetTurn.cardRefs)).toEqual(new Set(["VLV-THROW-01"]));
     expect(kapTurn.reply).not.toContain("Handloom");
     expect(velvetTurn.reply).not.toContain("Kiri-bath");
 

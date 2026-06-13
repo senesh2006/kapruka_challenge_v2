@@ -19,6 +19,7 @@ const EMOTION_LABEL: Record<ConciergeEmotion, string> = {
   thoughtful: "Thinking it through",
   apologetic: "Gentle",
   celebratory: "Celebrating with you",
+  condolence: "Here for you",
 };
 
 const AVATAR_URL = (import.meta.env.VITE_AVATAR_URL as string | undefined)?.trim() || undefined;

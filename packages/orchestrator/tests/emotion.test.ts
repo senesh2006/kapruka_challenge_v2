@@ -34,6 +34,26 @@ function planWith(hasItems: boolean): CandidatePlan {
 }
 
 describe("deriveEmotion", () => {
+  it("bereavement cues → condolence, never celebratory (even if items present)", () => {
+    expect(
+      deriveEmotion({
+        reply: "I'm so sorry for your loss.",
+        brief: brief("my grandma passed away and I'm in Australia, what can I send home"),
+        plan: planWith(true),
+      }),
+    ).toBe("condolence");
+  });
+
+  it("a funeral mention outranks a birthday mention", () => {
+    expect(
+      deriveEmotion({
+        reply: "Something dignified.",
+        brief: brief("missed her birthday, now it's her funeral"),
+        plan: planWith(true),
+      }),
+    ).toBe("condolence");
+  });
+
   it("apology cues → apologetic", () => {
     expect(
       deriveEmotion({

@@ -20,6 +20,7 @@ const EMOTION_COLOR: Record<ConciergeEmotion, string> = {
   thoughtful: "#6366f1",
   apologetic: "#64748b",
   celebratory: "#22c55e",
+  condolence: "#94a3b8",
 };
 
 // Emotion → ARKit morph-target targets (Ready Player Me blendshapes).
@@ -35,6 +36,9 @@ function emotionMorphs(emotion: ConciergeEmotion): Record<string, number> {
       return { browInnerUp: 0.3, browDownLeft: 0.15, browDownRight: 0.15, mouthPressLeft: 0.15, mouthPressRight: 0.15 };
     case "apologetic":
       return { browInnerUp: 0.5, mouthFrownLeft: 0.3, mouthFrownRight: 0.3 };
+    case "condolence":
+      // Soft, lowered, no smile — a gentle, sympathetic face.
+      return { browInnerUp: 0.6, mouthFrownLeft: 0.2, mouthFrownRight: 0.2, eyeLookDownLeft: 0.2, eyeLookDownRight: 0.2 };
     default:
       return {};
   }

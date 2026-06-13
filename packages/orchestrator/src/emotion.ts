@@ -11,11 +11,18 @@ export type ConciergeEmotion =
   | "excited"
   | "thoughtful"
   | "apologetic"
-  | "celebratory";
+  | "celebratory"
+  | "condolence";
 
-const APOLOGY = /\b(sorry|apolog|forgive|make it up|missed|couldn'?t be there|can'?t be there)\b/i;
-const CELEBRATION = /\b(birthday|wedding|anniversary|congratulat|graduat|newborn|baby|festival|avurudu|poson|vesak|deepavali|diwali|christmas)\b/i;
-const GIFT = /\b(gift|surprise|treat|spoil|love|miss you|thinking of you)\b/i;
+// Bereavement must win over everything — a death is never a "celebration",
+// even if the message also mentions a relative or a date.
+// Leading word-boundary only — these are prefixes ("apolog" must match
+// "apologise", "condolen" must match "condolence"), so no trailing \b.
+const BEREAVEMENT =
+  /\b(?:passed away|pass(?:ed)? on|funeral|condolen|bereave|sympath|loss of|deceased|mourning|rest in peace|rip\b|alms)/i;
+const APOLOGY = /\b(?:sorry|apolog|forgive|make it up|missed|couldn'?t be there|can'?t be there|i was wrong|my fault)/i;
+const CELEBRATION = /\b(?:birthday|wedding|anniversary|congratulat|graduat|newborn|baby|festival|avurudu|poson|vesak|deepavali|diwali|christmas)/i;
+const GIFT = /\b(?:gift|surprise|treat|spoil|love|miss you|thinking of you)/i;
 
 /**
  * Heuristic emotion derivation from the situation + the concierge's reply.
@@ -33,6 +40,8 @@ export function deriveEmotion(input: {
   const haystack = `${input.brief.situation} ${input.reply}`;
   const hasItems = Object.values(input.plan.candidatesBySlot).some((c) => c.length > 0);
 
+  // Sensitive situations take priority over celebratory/commerce cues.
+  if (BEREAVEMENT.test(haystack)) return "condolence";
   if (APOLOGY.test(haystack)) return "apologetic";
   if (CELEBRATION.test(haystack)) return "celebratory";
   if (hasItems && GIFT.test(haystack)) return "excited";

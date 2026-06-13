@@ -99,33 +99,65 @@ async function buildAdapter(): Promise<BlobStorageAdapter> {
 }
 
 /** Demo retailer connector used until a real Kapruka MCP client is wired. */
-function demoConnector(): RetailerConnector {
-  const items = [
-    {
-      id: "kap-cake-1",
-      title: "Kiri-bath cake 500g",
-      imageUrl: "https://img.example.com/kiri-bath.jpg",
-      price: { amount: 2400, currency: "LKR" },
-      categoryIds: ["cake"],
-      available: true,
-    },
-    {
-      id: "kap-flowers-1",
-      title: "Sunflower bouquet",
-      imageUrl: "https://img.example.com/sunflowers.jpg",
-      price: { amount: 3000, currency: "LKR" },
-      categoryIds: ["flowers"],
-      available: true,
-    },
+interface DemoItem {
+  id: string;
+  title: string;
+  imageUrl: string;
+  price: { amount: number; currency: string };
+  categoryIds: string[];
+  available: boolean;
+  keywords: string[];
+}
+
+// A small but varied demo catalogue so search returns situation-appropriate
+// products — including condolence items, so a bereavement never gets a
+// birthday cake. Replaced by the real Kapruka catalogue when the MCP is wired.
+const DEMO_CATALOGUE: DemoItem[] = [
+  { id: "kap-cake-kiri", title: "Kiri-bath cake 500g", imageUrl: "https://placehold.co/480x600/f59e0b/fff?text=Kiri-bath+Cake", price: { amount: 2400, currency: "LKR" }, categoryIds: ["cake"], available: true, keywords: ["cake", "birthday", "milk", "rice", "celebration", "sweet"] },
+  { id: "kap-cake-choc", title: "Chocolate gateau", imageUrl: "https://placehold.co/480x600/7c3f1d/fff?text=Chocolate+Gateau", price: { amount: 3500, currency: "LKR" }, categoryIds: ["cake"], available: true, keywords: ["cake", "chocolate", "birthday", "anniversary", "celebration", "treat", "sweet"] },
+  { id: "kap-flowers-sun", title: "Sunflower bouquet", imageUrl: "https://placehold.co/480x600/eab308/fff?text=Sunflowers", price: { amount: 3000, currency: "LKR" }, categoryIds: ["flowers"], available: true, keywords: ["flowers", "yellow", "sunflower", "birthday", "cheerful", "congratulations", "bouquet"] },
+  { id: "kap-flowers-rose", title: "Red rose bouquet", imageUrl: "https://placehold.co/480x600/dc2626/fff?text=Red+Roses", price: { amount: 4200, currency: "LKR" }, categoryIds: ["flowers"], available: true, keywords: ["flowers", "red", "rose", "anniversary", "love", "romance", "apology", "bouquet"] },
+  { id: "kap-sympathy-wreath", title: "White lily & chrysanthemum wreath", imageUrl: "https://placehold.co/480x600/64748b/fff?text=Sympathy+Wreath", price: { amount: 6500, currency: "LKR" }, categoryIds: ["flowers", "sympathy"], available: true, keywords: ["flowers", "white", "lily", "chrysanthemum", "sympathy", "condolence", "funeral", "bereavement", "wreath", "alms"] },
+  { id: "kap-sympathy-basket", title: "Condolence fruit & dry-goods basket", imageUrl: "https://placehold.co/480x600/78716c/fff?text=Condolence+Basket", price: { amount: 5200, currency: "LKR" }, categoryIds: ["hamper", "sympathy"], available: true, keywords: ["sympathy", "condolence", "hamper", "basket", "fruit", "alms", "bereavement", "offering"] },
+  { id: "kap-lamp", title: "Brass oil lamp (pahana)", imageUrl: "https://placehold.co/480x600/b45309/fff?text=Brass+Lamp", price: { amount: 4800, currency: "LKR" }, categoryIds: ["homeware", "wedding"], available: true, keywords: ["wedding", "lamp", "brass", "pahana", "housewarming", "religious", "homeware", "blessing", "gift"] },
+  { id: "kap-baby", title: "Newborn welcome hamper", imageUrl: "https://placehold.co/480x600/38bdf8/fff?text=Baby+Hamper", price: { amount: 5500, currency: "LKR" }, categoryIds: ["hamper", "baby"], available: true, keywords: ["baby", "newborn", "hamper", "gift", "welcome", "shower"] },
+  { id: "kap-choc-box", title: "Premium chocolate box", imageUrl: "https://placehold.co/480x600/4c1d95/fff?text=Chocolate+Box", price: { amount: 2800, currency: "LKR" }, categoryIds: ["chocolate"], available: true, keywords: ["chocolate", "apology", "gift", "treat", "sweet", "thank you"] },
+];
+
+const STOPWORDS = new Set(["the", "a", "an", "and", "or", "for", "to", "in", "on", "of", "my", "i", "is", "it", "send", "home", "want", "need", "with", "some", "her", "his", "him", "she", "he", "them", "that", "this", "what", "you", "do", "recommend", "me", "im", "be", "able", "go", "there", "wont", "cant"]);
+
+function searchDemo(query: string | undefined, categoryIds: string[] | undefined, limit: number): DemoItem[] {
+  const terms = [
+    ...(query ?? "").toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 2 && !STOPWORDS.has(w)),
+    ...(categoryIds ?? []).map((c) => c.toLowerCase()),
   ];
+  if (terms.length === 0) return DEMO_CATALOGUE.slice(0, limit);
+  const scored = DEMO_CATALOGUE.map((item) => {
+    let score = 0;
+    const hay = [...item.keywords, ...item.categoryIds, ...item.title.toLowerCase().split(/\s+/)];
+    for (const term of terms) {
+      if (item.keywords.includes(term) || item.categoryIds.includes(term)) score += 3;
+      else if (hay.some((k) => k.startsWith(term) || term.startsWith(k))) score += 1;
+    }
+    return { item, score };
+  });
+  const hits = scored.filter((s) => s.score > 0).sort((a, b) => b.score - a.score);
+  return hits.slice(0, limit).map((s) => s.item);
+}
+
+function demoConnector(): RetailerConnector {
   return {
     tenantId: "kapruka" as never,
     catalogue: {
       kind: "catalogue",
       adapter: "demo",
-      searchProducts: async () => ({ items: items as never }),
-      getProduct: async () => null,
-      listCategories: async () => [],
+      searchProducts: async (intent: { query?: string; categoryIds?: string[]; limit?: number }) => ({
+        items: searchDemo(intent.query, intent.categoryIds, intent.limit ?? 8) as never,
+      }),
+      getProduct: async (id: unknown) =>
+        (DEMO_CATALOGUE.find((i) => i.id === String(id)) ?? null) as never,
+      listCategories: async () =>
+        [...new Set(DEMO_CATALOGUE.flatMap((i) => i.categoryIds))].map((c) => ({ id: c, name: c })) as never,
     },
     delivery: {
       kind: "delivery",

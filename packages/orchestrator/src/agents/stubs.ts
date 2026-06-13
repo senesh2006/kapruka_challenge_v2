@@ -50,7 +50,7 @@ export class StubConciergeAgent implements ConciergeAgent {
     if (!input.previousBrief) {
       brief.situation = input.message;
       brief.detectedLocale = locale;
-      brief.slots = naiveSlotExtraction(input.message);
+      brief.slots = slotsForOccasion(detectOccasion(input.message), input.message);
     } else {
       brief.situation = input.previousBrief.situation || input.message;
     }
@@ -66,15 +66,13 @@ export class StubConciergeAgent implements ConciergeAgent {
     const top = topPicks(input.plan);
     const cardRefs = top.map((c) => c.product.id);
     const voice = input.persona.brandVoice || "Hari";
+    const occasion = detectOccasion(input.plan.brief.situation);
     if (top.length === 0) {
-      return {
-        reply: `${voice}: Tell me a little more about the situation and I'll have something thoughtful ready.`,
-        cardRefs,
-      };
+      return { reply: `${voice}: ${emptyReplyFor(occasion)}`, cardRefs };
     }
     const lines = top.map((c) => `· ${c.product.title} — ${c.reason}`);
     const reply = [
-      `${voice}: Here's what I'd recommend.`,
+      `${voice}: ${openerFor(occasion)}`,
       ...lines,
       summariseDelivery(input.plan.delivery),
     ]
@@ -318,17 +316,98 @@ function detectLocale(message: string, persona: Persona): Locale {
   return detectLocaleFromMessage(message, { enabledLanguages: persona.languages });
 }
 
-function naiveSlotExtraction(message: string): IntentSlot[] {
-  // Trivial extraction so the loop has something to do. Real implementation
-  // is a structured NIM call routed via @sevana/model-gateway.
-  return [
-    {
-      id: "primary",
-      description: message,
-      categoryHints: [],
-      required: true,
-    },
-  ];
+/**
+ * The situation categories the stub concierge reads. A NIM concierge replaces
+ * this with real reasoning, but even the stub must not recommend a birthday
+ * cake for a bereavement — that's the whole point of "reading the situation".
+ */
+export type Occasion =
+  | "bereavement"
+  | "apology"
+  | "birthday"
+  | "wedding"
+  | "anniversary"
+  | "newborn"
+  | "generic";
+
+// Leading boundary only (prefixes like "apolog"/"condolen" must match longer
+// words). Bereavement first — it must never be misread as a celebration.
+const OCCASION_PATTERNS: ReadonlyArray<readonly [Occasion, RegExp]> = [
+  ["bereavement", /\b(?:passed away|pass(?:ed)? on|funeral|condolen|bereave|sympath|loss of|deceased|mourning|rest in peace|rip\b|alms)/i],
+  ["apology", /\b(?:sorry|apolog|forgive|make it up|i was wrong|my fault|let (?:her|him|them) down)/i],
+  ["newborn", /\b(?:newborn|new baby|baby shower|just had a baby|new arrival)/i],
+  ["wedding", /\b(?:wedding|getting married|nuptial|marriage|tie the knot)/i],
+  ["anniversary", /\banniversary/i],
+  ["birthday", /\b(?:birthday|bday|b-day|turning \d+)/i],
+];
+
+export function detectOccasion(message: string): Occasion {
+  for (const [occ, re] of OCCASION_PATTERNS) {
+    if (re.test(message)) return occ;
+  }
+  return "generic";
+}
+
+function slot(id: string, description: string, categoryHints: string[], required = true): IntentSlot {
+  return { id, description, categoryHints, required };
+}
+
+/**
+ * Turn a read occasion into intent slots with category hints. The first slot
+ * keeps the id "primary" so the loop + downstream contracts stay stable; extra
+ * slots coordinate a small, situation-appropriate set.
+ */
+function slotsForOccasion(occasion: Occasion, message: string): IntentSlot[] {
+  switch (occasion) {
+    case "bereavement":
+      return [
+        slot("primary", "white sympathy flowers condolence wreath", ["sympathy", "flowers"]),
+        slot("hamper", "condolence fruit basket or alms offering", ["sympathy", "hamper"], false),
+      ];
+    case "apology":
+      return [
+        slot("primary", "apology flowers bouquet", ["flowers"]),
+        slot("sweet", "chocolates or a small cake", ["chocolate", "cake"], false),
+      ];
+    case "birthday":
+      return [
+        slot("primary", "birthday cake", ["cake"]),
+        slot("flowers", "birthday flowers bouquet", ["flowers"], false),
+      ];
+    case "wedding":
+      return [slot("primary", "wedding gift brass oil lamp homeware", ["wedding", "homeware"])];
+    case "anniversary":
+      return [
+        slot("primary", "anniversary red roses bouquet", ["flowers"]),
+        slot("cake", "celebration cake", ["cake"], false),
+      ];
+    case "newborn":
+      return [slot("primary", "newborn baby gift hamper", ["baby", "hamper"])];
+    default:
+      return [slot("primary", message, [])];
+  }
+}
+
+function openerFor(occasion: Occasion): string {
+  switch (occasion) {
+    case "bereavement":
+      return "I'm so sorry for your loss — and being far from home makes it heavier. Here's something dignified I can send in your place.";
+    case "apology":
+      return "That's a tender spot to be in. Something heartfelt can open the door — here's what I'd send.";
+    case "newborn":
+      return "Congratulations on the new arrival! Here's a warm welcome I'd send.";
+    case "wedding":
+      return "A wedding — wonderful. Here's a gift with meaning.";
+    default:
+      return "Here's what I'd recommend.";
+  }
+}
+
+function emptyReplyFor(occasion: Occasion): string {
+  if (occasion === "bereavement") {
+    return "I'm so sorry for your loss. Tell me a little about your grandmother and the family, and I'll arrange something dignified to send home in your place.";
+  }
+  return "Tell me a little more about the situation and I'll have something thoughtful ready.";
 }
 
 function topPicks(plan: CandidatePlan): SlotCandidate[] {
