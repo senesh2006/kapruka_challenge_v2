@@ -50,6 +50,7 @@ import {
   registerKaprukaAdapter,
   type EventBus,
   type RetailerConnector,
+  type SearchIntent,
 } from "@sevana/connectors";
 import {
   SessionSchema,
@@ -151,8 +152,8 @@ function demoConnector(): RetailerConnector {
     catalogue: {
       kind: "catalogue",
       adapter: "demo",
-      searchProducts: async (intent: { query?: string; categoryIds?: string[]; limit?: number }) => ({
-        items: searchDemo(intent.query, intent.categoryIds, intent.limit ?? 8) as never,
+      searchProducts: async (intent: SearchIntent) => ({
+        items: searchDemo(intent.query, intent.categoryIds, intent.limit) as never,
       }),
       getProduct: async (id: unknown) =>
         (DEMO_CATALOGUE.find((i) => i.id === String(id)) ?? null) as never,
