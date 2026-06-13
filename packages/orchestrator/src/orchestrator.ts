@@ -23,6 +23,7 @@ import type {
 import { emptyPlan } from "./brief/index.js";
 import { StageEmitter } from "./events/index.js";
 import type { TryOnService } from "./visuals/index.js";
+import { deriveEmotion, type ConciergeEmotion } from "./emotion.js";
 
 export interface OrchestratorAgents {
   concierge: ConciergeAgent;
@@ -67,6 +68,8 @@ export interface TurnResult {
   plan: CandidatePlan;
   briefAfter: WorkingBrief;
   guardrailVerdict: "approved" | "blocked";
+  /** Emotional register for the turn — drives the avatar's expression + motion. */
+  emotion: ConciergeEmotion;
   events: number;
 }
 
@@ -163,6 +166,7 @@ export class Orchestrator {
           plan,
           briefAfter: brief,
           guardrailVerdict: "blocked",
+          emotion: "neutral",
           events: round,
         };
       }
@@ -193,6 +197,7 @@ export class Orchestrator {
           plan,
           briefAfter: brief,
           guardrailVerdict: "blocked",
+          emotion: "neutral",
           events: round,
         };
       }
@@ -217,7 +222,8 @@ export class Orchestrator {
         emit("agent.degraded", round, undefined, { agent: "retention", op: "update" }, errorMessage(err));
       }
 
-      emit("turn.end", round, Date.now() - startedAt, { channel: input.session.channel });
+      const emotion = deriveEmotion({ reply: presented.reply, brief, plan });
+      emit("turn.end", round, Date.now() - startedAt, { channel: input.session.channel, emotion });
       return {
         reply: presented.reply,
         cardRefs: presented.cardRefs,
@@ -225,6 +231,7 @@ export class Orchestrator {
         plan,
         briefAfter: brief,
         guardrailVerdict: "approved",
+        emotion,
         events: round,
       };
     } catch (err) {

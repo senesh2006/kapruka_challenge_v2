@@ -116,7 +116,7 @@ The merchant console deploys as a Vite static SPA, with Vercel serverless functi
 
 ### What deploys
 
-- **Static SPA** at `/` — full merchant console with seven routed pages.
+- **Static SPA** at `/` — full merchant console with routed pages, including **`/concierge`**: a full-screen 3D talking avatar of Hari. A Ready Player Me avatar (set `VITE_AVATAR_URL` to a `.glb`) reacts with facial expressions + lip-sync to the turn's derived `emotion`, and the browser Web Speech API gives tap-to-talk voice in + Hari speaking back. Falls back to a built-in animated energy-orb avatar when no `VITE_AVATAR_URL` is set, and to text when the browser lacks Web Speech. The three.js bundle is code-split so it loads only on this route.
 - **`GET /api/health`** — health check.
 - **`POST /api/turn`** — orchestrator turn endpoint. Runs the **real** multi-agent loop (Shopper → Merchandiser → Logistics → Guardrail → Concierge) with a demo retailer connector and the storage-backed Retention agent. Sessions persist to Vercel Blob (`sessions/{tenantId}/{id}.json`) so conversations continue across cold starts. The Concierge stub stands in for NIM until a key is configured.
 - **`POST /api/order`** — explicit-confirmation gated checkout (FR-10). The Guardrail rejects with HTTP 412 unless `confirm: true` is in the body. On approval the demo connector returns a pay link and the order is persisted to `orders/{tenantId}/{id}.json`.

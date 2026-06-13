@@ -35,11 +35,22 @@ export const RecommendedCardSchema = z.object({
 });
 export type RecommendedCard = z.infer<typeof RecommendedCardSchema>;
 
+export const ConciergeEmotionSchema = z.enum([
+  "neutral",
+  "warm",
+  "excited",
+  "thoughtful",
+  "apologetic",
+  "celebratory",
+]);
+export type ConciergeEmotion = z.infer<typeof ConciergeEmotionSchema>;
+
 export const TurnResponseSchema = z.object({
   sessionId: z.string(),
   reply: z.string(),
   cardRefs: z.array(z.string()).default([]),
   cards: z.array(RecommendedCardSchema).default([]),
+  emotion: ConciergeEmotionSchema.default("warm"),
   guardrailVerdict: z.enum(["approved", "blocked"]),
   detectedLocale: z.enum(["en", "si", "ta", "tanglish"]).optional(),
   at: z.string(),
