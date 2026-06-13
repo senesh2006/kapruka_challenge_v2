@@ -1,13 +1,12 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Mic, MicOff, Send, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { Mic, MicOff, Send, Volume2, VolumeX } from "lucide-react";
 import {
   ChannelClient,
   type ConciergeEmotion,
   type RecommendedCard,
 } from "@sevana/channels";
-import { Avatar3D } from "../avatar/Avatar3D.js";
+import { EmojiAvatar } from "../avatar/EmojiAvatar.js";
 import { useVoice } from "../avatar/useVoice.js";
-import { Button } from "../components/ui/Button.js";
 import { cn } from "../lib/cn.js";
 
 type LocaleHint = "en" | "si" | "ta" | "tanglish";
@@ -15,14 +14,12 @@ type LocaleHint = "en" | "si" | "ta" | "tanglish";
 const EMOTION_LABEL: Record<ConciergeEmotion, string> = {
   neutral: "Listening",
   warm: "Warm",
-  excited: "Excited",
+  excited: "Excited for you",
   thoughtful: "Thinking it through",
   apologetic: "Gentle",
   celebratory: "Celebrating with you",
   condolence: "Here for you",
 };
-
-const AVATAR_URL = (import.meta.env.VITE_AVATAR_URL as string | undefined)?.trim() || undefined;
 
 export function ConciergePage() {
   const client = useMemo(
@@ -32,7 +29,7 @@ export function ConciergePage() {
   const voice = useVoice();
   const [emotion, setEmotion] = useState<ConciergeEmotion>("warm");
   const [reply, setReply] = useState<string>(
-    "Tell me the situation — an occasion, who it's for, the feeling — and I'll take it from there.",
+    "Tell me the situation — the occasion, who it's for, the feeling. I'll take it from there.",
   );
   const [cards, setCards] = useState<RecommendedCard[]>([]);
   const [busy, setBusy] = useState(false);
@@ -69,51 +66,75 @@ export function ConciergePage() {
       return;
     }
     voice.cancelSpeak();
-    voice.startListening(localeRef.current, (finalText) => void send(finalText));
+    voice.startListening(localeRef.current, (final) => void send(final));
   }, [voice, send]);
 
   return (
-    <div className="relative -mx-6 -my-8 h-[calc(100vh-4rem)] overflow-hidden bg-gradient-to-b from-background to-muted/40 lg:-mx-10">
-      {/* Avatar stage */}
-      <div className="absolute inset-0">
-        <Avatar3D
-          {...(AVATAR_URL ? { avatarUrl: AVATAR_URL } : {})}
-          emotion={emotion}
-          speaking={voice.speaking}
-          listening={voice.listening}
-        />
+    <main className="relative min-h-screen overflow-hidden bg-gradient-to-b from-amber-50 via-white to-amber-50 text-foreground antialiased">
+      {/* Soft background motes */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-20 top-20 h-72 w-72 rounded-full bg-amber-200/40 blur-3xl" />
+        <div className="absolute -right-24 top-60 h-80 w-80 rounded-full bg-rose-200/30 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-yellow-200/40 blur-3xl" />
       </div>
 
-      {/* Top status */}
-      <div className="pointer-events-none absolute left-0 right-0 top-0 flex items-center justify-between p-6">
-        <div className="flex items-center gap-2 rounded-full bg-card/80 px-3 py-1.5 shadow-sm backdrop-blur">
-          <Sparkles className="h-4 w-4 text-primary" aria-hidden />
-          <span className="text-sm font-semibold">Hari</span>
-          <span className="text-xs text-muted-foreground">· {EMOTION_LABEL[emotion]}</span>
+      {/* Single column, centered. */}
+      <div className="relative mx-auto flex min-h-screen max-w-2xl flex-col items-center px-5 py-8 sm:py-12">
+        {/* Top — mute toggle only. No nav, no dashboard. */}
+        <header className="flex w-full items-center justify-between">
+          <span className="text-sm font-medium tracking-wide text-foreground/70">Hari</span>
+          <button
+            type="button"
+            onClick={() => setMuted((m) => !m)}
+            aria-label={muted ? "Unmute Hari" : "Mute Hari"}
+            className="grid h-9 w-9 place-items-center rounded-full text-foreground/70 transition-colors hover:bg-foreground/5"
+          >
+            {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </button>
+        </header>
+
+        {/* Avatar */}
+        <div className="mt-2 flex w-full justify-center">
+          <div className="h-56 w-56 sm:h-72 sm:w-72">
+            <EmojiAvatar
+              emotion={emotion}
+              speaking={voice.speaking}
+              listening={voice.listening}
+              speechPulse={voice.speechPulse}
+            />
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setMuted((m) => !m)}
-          aria-label={muted ? "Unmute Hari" : "Mute Hari"}
-          className="pointer-events-auto grid h-9 w-9 place-items-center rounded-full bg-card/80 text-foreground shadow-sm backdrop-blur transition-colors hover:bg-card"
-        >
-          {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-        </button>
-      </div>
+        <p className="mt-1 text-xs uppercase tracking-[0.18em] text-foreground/50">
+          {voice.listening ? "Listening…" : voice.speaking ? "Speaking" : EMOTION_LABEL[emotion]}
+        </p>
 
-      {/* Caption + cards + controls */}
-      <div className="absolute bottom-0 left-0 right-0 space-y-3 p-6">
+        {/* Caption */}
+        <p
+          className={cn(
+            "mt-7 max-w-xl text-center text-base leading-relaxed text-foreground sm:text-lg",
+            busy && "text-foreground/50",
+          )}
+        >
+          {voice.interim ? <em className="text-foreground/50">{voice.interim}</em> : reply}
+        </p>
+
+        {/* Cards (only when there's something to show) */}
         {cards.length > 0 ? (
-          <div className="mx-auto flex max-w-3xl gap-3 overflow-x-auto pb-1">
+          <div className="mt-6 flex w-full gap-3 overflow-x-auto pb-2">
             {cards.map((c) => (
               <article
                 key={String(c.productId)}
-                className="w-40 shrink-0 overflow-hidden rounded-lg border border-border bg-card/90 shadow-sm backdrop-blur"
+                className="w-36 shrink-0 overflow-hidden rounded-xl bg-white/80 shadow-sm ring-1 ring-black/5 backdrop-blur"
               >
-                <img src={c.renderUrl ?? c.imageUrl} alt={c.title} className="aspect-[4/5] w-full object-cover" loading="lazy" />
-                <div className="space-y-0.5 p-2">
-                  <p className="truncate text-xs font-semibold">{c.title}</p>
-                  <p className="font-mono text-[11px] text-muted-foreground">
+                <img
+                  src={c.renderUrl ?? c.imageUrl}
+                  alt={c.title}
+                  loading="lazy"
+                  className="aspect-[4/5] w-full object-cover"
+                />
+                <div className="space-y-0.5 p-2.5">
+                  <p className="truncate text-[13px] font-semibold leading-tight">{c.title}</p>
+                  <p className="font-mono text-[11px] text-foreground/60">
                     {c.price.currency} {c.price.amount.toLocaleString()}
                   </p>
                 </div>
@@ -122,50 +143,55 @@ export function ConciergePage() {
           </div>
         ) : null}
 
-        <div className="mx-auto max-w-2xl rounded-2xl bg-card/85 p-4 shadow-lg backdrop-blur">
-          <p className={cn("min-h-[3rem] text-sm leading-relaxed", busy && "text-muted-foreground")}>
-            {voice.interim ? <span className="text-muted-foreground italic">{voice.interim}</span> : reply}
-          </p>
-          <div className="mt-3 flex items-end gap-2">
-            {voice.sttSupported ? (
-              <Button
-                type="button"
-                variant={voice.listening ? "destructive" : "primary"}
-                size="icon"
-                onClick={onMic}
-                aria-label={voice.listening ? "Stop listening" : "Talk to Hari"}
-                className="shrink-0"
-              >
-                {voice.listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-              </Button>
-            ) : null}
-            <form
-              className="flex flex-1 items-end gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void send(draft);
-                setDraft("");
-              }}
+        <div className="flex-1" />
+
+        {/* Input dock */}
+        <form
+          className="sticky bottom-4 mt-8 flex w-full items-center gap-2 rounded-full bg-white/90 p-1.5 pl-2 shadow-md ring-1 ring-black/5 backdrop-blur"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void send(draft);
+            setDraft("");
+          }}
+        >
+          {voice.sttSupported ? (
+            <button
+              type="button"
+              onClick={onMic}
+              aria-label={voice.listening ? "Stop listening" : "Talk to Hari"}
+              className={cn(
+                "grid h-10 w-10 shrink-0 place-items-center rounded-full text-white transition-colors",
+                voice.listening
+                  ? "bg-red-500 hover:bg-red-600"
+                  : "bg-amber-400 hover:bg-amber-500",
+              )}
             >
-              <input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder={voice.sttSupported ? "…or type the situation" : "Tell Hari the situation"}
-                disabled={busy}
-                className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
-              <Button type="submit" size="icon" disabled={!draft.trim() || busy} aria-label="Send">
-                <Send className="h-4 w-4" />
-              </Button>
-            </form>
-          </div>
-          {!voice.ttsSupported ? (
-            <p className="mt-2 text-xs text-muted-foreground">
-              Voice output isn't available in this browser — Hari replies in text. Try Chrome or Edge for the full voice experience.
-            </p>
+              {voice.listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </button>
           ) : null}
-        </div>
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={voice.sttSupported ? "…or type the situation" : "Tell Hari the situation"}
+            disabled={busy}
+            className="flex-1 bg-transparent px-2 py-2 text-sm placeholder:text-foreground/40 focus:outline-none"
+          />
+          <button
+            type="submit"
+            disabled={!draft.trim() || busy}
+            aria-label="Send"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-foreground text-background transition-opacity hover:opacity-90 disabled:opacity-30"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </form>
+
+        {!voice.ttsSupported ? (
+          <p className="mt-2 text-center text-[11px] text-foreground/40">
+            Voice output isn't available in this browser — Hari replies in text. Try Chrome or Edge for the full voice experience.
+          </p>
+        ) : null}
       </div>
-    </div>
+    </main>
   );
 }

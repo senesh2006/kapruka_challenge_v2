@@ -55,10 +55,16 @@ export interface UseVoiceResult {
   speaking: boolean;
   /** Live (interim + final) transcript while listening. */
   interim: string;
+  /**
+   * Monotonically incremented on every word boundary the SpeechSynthesis
+   * utterance fires — the lip-sync layer reads this so the mouth actually
+   * pulses on each spoken word, not a fake oscillation.
+   */
+  speechPulse: number;
   /** Begin listening; resolves the final transcript via onFinal. */
   startListening: (locale: LocaleHint, onFinal: (text: string) => void) => void;
   stopListening: () => void;
-  /** Speak text in the given locale; lip-sync reads `speaking`. */
+  /** Speak text in the given locale; lip-sync reads `speaking` + `speechPulse`. */
   speak: (text: string, locale: LocaleHint) => void;
   cancelSpeak: () => void;
 }
@@ -67,6 +73,7 @@ export function useVoice(): UseVoiceResult {
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [interim, setInterim] = useState("");
+  const [speechPulse, setSpeechPulse] = useState(0);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const onFinalRef = useRef<((text: string) => void) | null>(null);
 
@@ -139,6 +146,10 @@ export function useVoice(): UseVoiceResult {
       utt.onstart = () => setSpeaking(true);
       utt.onend = () => setSpeaking(false);
       utt.onerror = () => setSpeaking(false);
+      // Real word-boundary signal — the avatar's mouth pulses on each one.
+      utt.onboundary = (e: SpeechSynthesisEvent) => {
+        if (e.name === "word") setSpeechPulse((p) => p + 1);
+      };
       window.speechSynthesis.speak(utt);
     },
     [ttsSupported],
@@ -159,6 +170,7 @@ export function useVoice(): UseVoiceResult {
     listening,
     speaking,
     interim,
+    speechPulse,
     startListening,
     stopListening,
     speak,

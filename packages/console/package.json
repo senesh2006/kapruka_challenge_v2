@@ -11,23 +11,17 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@react-three/drei": "^9.99.0",
-    "@react-three/fiber": "^8.15.19",
     "@sevana/channels": "workspace:*",
     "@sevana/shared": "workspace:*",
     "clsx": "^2.1.0",
     "lucide-react": "^0.378.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.23.0",
-    "recharts": "^2.12.7",
-    "tailwind-merge": "^2.3.0",
-    "three": "^0.161.0"
+    "tailwind-merge": "^2.3.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
-    "@types/three": "^0.161.0",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.38",
