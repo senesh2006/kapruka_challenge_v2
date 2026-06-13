@@ -188,7 +188,11 @@ function buildRegistry() {
   const registry = new ConnectorRegistry();
   registerKaprukaAdapter(registry, {
     buildClient: () =>
-      new HttpMcpClient({ baseUrl: "https://mcp.kapruka.test", fetchImpl: fakeKaprukaMcpFetch() }),
+      new HttpMcpClient({
+        baseUrl: "https://mcp.kapruka.test",
+        protocol: "rest",
+        fetchImpl: fakeKaprukaMcpFetch(),
+      }),
   });
   registerRestAdapter(registry, {
     buildClient: (credential) =>

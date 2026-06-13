@@ -227,11 +227,18 @@ function buildConcierge(): ConciergeAgent {
 async function buildRetailerConnector(tenant: Tenant): Promise<RetailerConnector> {
   const baseUrl = process.env.KAPRUKA_MCP_BASE_URL;
   if (!baseUrl) return demoConnector();
+  // Wire format is env-tunable so we can match the real Kapruka MCP without a
+  // code change: KAPRUKA_MCP_PROTOCOL = "jsonrpc" (default, standard MCP) |
+  // "rest"; KAPRUKA_MCP_PATH = the JSON-RPC endpoint suffix (default "").
+  const protocol = process.env.KAPRUKA_MCP_PROTOCOL === "rest" ? "rest" : "jsonrpc";
+  const rpcPath = process.env.KAPRUKA_MCP_PATH ?? "";
   const registry = new ConnectorRegistry();
   registerKaprukaAdapter(registry, {
     buildClient: (credential) =>
       new HttpMcpClient({
         baseUrl,
+        protocol,
+        rpcPath,
         ...(typeof credential.apiKey === "string" ? { apiKey: credential.apiKey } : {}),
       }),
   });

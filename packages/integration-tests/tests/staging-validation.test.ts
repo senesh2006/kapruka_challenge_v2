@@ -282,6 +282,7 @@ describe("PRD §12.1 — end-to-end staging validation", () => {
         const apiKey = typeof credential.apiKey === "string" ? credential.apiKey : undefined;
         return new HttpMcpClient({
           baseUrl: MCP_BASE_URL,
+          protocol: "rest",
           ...(apiKey !== undefined ? { apiKey } : {}),
           fetchImpl: fakeMcpFetch,
         });
