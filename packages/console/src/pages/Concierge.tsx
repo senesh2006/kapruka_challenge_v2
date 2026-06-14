@@ -5,7 +5,7 @@ import {
   type ConciergeEmotion,
   type RecommendedCard,
 } from "@sevana/channels";
-import { EmojiAvatar } from "../avatar/EmojiAvatar.js";
+import { AvatarStage } from "../avatar/AvatarStage.js";
 import { useVoice } from "../avatar/useVoice.js";
 import { cn } from "../lib/cn.js";
 
@@ -96,7 +96,7 @@ export function ConciergePage() {
         {/* Avatar */}
         <div className="mt-2 flex w-full justify-center">
           <div className="h-56 w-56 sm:h-72 sm:w-72">
-            <EmojiAvatar
+            <AvatarStage
               emotion={emotion}
               speaking={voice.speaking}
               listening={voice.listening}
