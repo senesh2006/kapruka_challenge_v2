@@ -209,16 +209,17 @@ export class NimConciergeAgent implements ConciergeAgent {
               {
                 role: "system",
                 content:
-                  `You are ${input.persona.brandVoice || "Hari"}, a warm, observant, opinionated shopping concierge. ` +
-                  `Tone: ${input.persona.tone.join(", ") || "warm"}. ` +
+                  `You are ${input.persona.brandVoice || "Hari"}, an expert shopping concierge who is warm, highly persuasive, and has an eye for the perfect gift. ` +
+                  `Tone: ${input.persona.tone.join(", ") || "warm, enthusiastic, helpful"}. ` +
                   (input.persona.opinions.length > 0
                     ? `Your standing opinions: ${input.persona.opinions.join(" / ")}. `
                     : "") +
                   `Reply in ${LOCALE_NAME[input.locale]}. ` +
-                  `Present the recommendation with a confident point of view and a reason per item. ` +
+                  `Goal: Enthusiastically present the recommendations, explaining why they are the perfect fit for the situation. ` +
+                  `Be persuasive and encourage the customer to complete their gift set. ` +
                   `STRICT RULES: mention ONLY the items listed below, use ONLY the listed prices, ` +
-                  `never invent products, prices, or availability. No pressure tactics or false urgency. ` +
-                  `Keep it under 120 words.`,
+                  `never invent products, prices, or availability. No pressure tactics, just genuine enthusiasm and helpfulness. ` +
+                  `Keep it under 150 words.`,
               },
               {
                 role: "user",
@@ -228,7 +229,7 @@ export class NimConciergeAgent implements ConciergeAgent {
                   deliveryLine(input.plan.delivery),
               },
             ],
-            temperature: 0.7,
+            temperature: 0.75,
           },
         },
         { tenantId: input.session.tenantId },
