@@ -149,7 +149,8 @@ export function useVoice(): UseVoiceResult {
       cancelSpeak();
 
       const lang = BCP47[locale];
-      const langPrefix = lang.split("-")[0] ?? "en";
+      // Google TTS expects 'si' for Sinhala, 'ta' for Tamil, etc.
+      const langPrefix = locale === "si" ? "si" : (lang.split("-")[0] ?? "en");
       
       const voices = typeof window !== "undefined" ? window.speechSynthesis.getVoices() : [];
       
@@ -168,8 +169,10 @@ export function useVoice(): UseVoiceResult {
       // Fallback for Sinhala (which usually doesn't have a high-quality native voice in browsers) 
       // or if no high-quality native voice found.
       if (locale === "si" || !hasNativeVoice) {
+        // Use tw-ob client which is more permissive for free usage
         const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${langPrefix}&client=tw-ob`;
-        const audio = new Audio(url);
+        const audio = new Audio();
+        audio.src = url;
         audioRef.current = audio;
 
         audio.onplay = () => {
@@ -186,7 +189,8 @@ export function useVoice(): UseVoiceResult {
             pulseIntervalRef.current = null;
           }
         };
-        audio.onerror = () => {
+        audio.onerror = (e) => {
+          console.error("Audio playback error:", e);
           setSpeaking(false);
           if (pulseIntervalRef.current) {
             clearInterval(pulseIntervalRef.current);
@@ -194,7 +198,10 @@ export function useVoice(): UseVoiceResult {
           }
         };
 
-        audio.play().catch(() => setSpeaking(false));
+        audio.play().catch((err) => {
+          console.error("Audio play failed:", err);
+          setSpeaking(false);
+        });
         return;
       }
 
