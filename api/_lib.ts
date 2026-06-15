@@ -203,7 +203,7 @@ const NOW_ISO = (): string => new Date().toISOString();
 
 /** Adapter the tenant binds to: real Kapruka MCP when configured, demo otherwise. */
 function activeAdapter(): "kapruka" | "demo" {
-  return process.env.KAPRUKA_MCP_BASE_URL ? "kapruka" : "demo";
+  return "kapruka";
 }
 
 export function demoTenant(): Tenant {
