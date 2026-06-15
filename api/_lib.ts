@@ -203,7 +203,11 @@ const NOW_ISO = (): string => new Date().toISOString();
 
 /** Adapter the tenant binds to: real Kapruka MCP when configured, demo otherwise. */
 function activeAdapter(): "kapruka" | "demo" {
-  return "kapruka";
+  // We use the 'demo' adapter by default because the real mcp.kapruka.com 
+  // endpoint is currently behind a Cloudflare bot challenge that blocks
+  // our server-to-server calls without a whitelisted IP or bypassing key.
+  // The 'demo' adapter now uses an expanded catalogue with high variety.
+  return process.env.KAPRUKA_MCP_BASE_URL ? "kapruka" : "demo";
 }
 
 export function demoTenant(): Tenant {
