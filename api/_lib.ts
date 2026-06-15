@@ -83,7 +83,12 @@ async function buildAdapter(): Promise<BlobStorageAdapter> {
   // Graceful fallback for missing token to prevent 500 errors
   const token = process.env.BLOB_READ_WRITE_TOKEN;
   if (!token || token.trim() === "") {
-    console.warn("BLOB_READ_WRITE_TOKEN is missing. Using InMemoryBlobAdapter (sessions will not persist across cold starts).");
+    console.warn(
+      "MISSING CONFIG: BLOB_READ_WRITE_TOKEN is not set. " +
+      "Sessions will not persist across cold starts. " +
+      "FIX: In Vercel Dashboard, go to Storage -> Connect Store -> Vercel Blob, " +
+      "then redeploy."
+    );
     return new InMemoryBlobAdapter();
   }
   
