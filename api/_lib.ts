@@ -8,6 +8,7 @@
 import {
   InMemoryBlobAdapter,
   VercelBlobAdapter,
+  NeonStorageAdapter,
   type BlobStorageAdapter,
   CustomerProfileRepository,
   SessionRepository,
@@ -80,33 +81,44 @@ let cached: {
 } | null = null;
 
 async function buildAdapter(): Promise<BlobStorageAdapter> {
-  // Graceful fallback for missing token to prevent 500 errors
+  // 1. Prioritize Neon (PostgreSQL) for structured, durable session data.
+  const neonUrl = process.env.NEON_DATABASE_URL;
+  if (neonUrl && neonUrl.trim() !== "") {
+    try {
+      const adapter = new NeonStorageAdapter(neonUrl);
+      // Ensure the KV table exists.
+      await adapter.setup();
+      return adapter;
+    } catch (err) {
+      console.error("Failed to initialize Neon adapter, falling back:", err);
+    }
+  }
+
+  // 2. Fallback to Vercel Blob.
   const token = process.env.BLOB_READ_WRITE_TOKEN;
-  if (!token || token.trim() === "") {
-    console.warn(
-      "MISSING CONFIG: BLOB_READ_WRITE_TOKEN is not set. " +
-      "Sessions will not persist across cold starts. " +
-      "FIX: In Vercel Dashboard, go to Storage -> Connect Store -> Vercel Blob, " +
-      "then redeploy."
-    );
-    return new InMemoryBlobAdapter();
+  if (token && token.trim() !== "") {
+    try {
+      const vercelBlob = await import("@vercel/blob");
+      return new VercelBlobAdapter({
+        vercelBlob: {
+          put: vercelBlob.put as never,
+          head: vercelBlob.head as never,
+          list: vercelBlob.list as never,
+          del: vercelBlob.del as never,
+        },
+        token,
+      });
+    } catch (err) {
+      console.error("Failed to load Vercel Blob adapter, falling back to in-memory:", err);
+    }
   }
-  
-  try {
-    const vercelBlob = await import("@vercel/blob");
-    return new VercelBlobAdapter({
-      vercelBlob: {
-        put: vercelBlob.put as never,
-        head: vercelBlob.head as never,
-        list: vercelBlob.list as never,
-        del: vercelBlob.del as never,
-      },
-      token,
-    });
-  } catch (err) {
-    console.error("Failed to load Vercel Blob adapter, falling back to in-memory:", err);
-    return new InMemoryBlobAdapter();
-  }
+
+  console.warn(
+    "MISSING CONFIG: NEON_DATABASE_URL or BLOB_READ_WRITE_TOKEN is not set. " +
+    "Sessions will not persist across cold starts. " +
+    "FIX: Set NEON_DATABASE_URL to your Neon connection string."
+  );
+  return new InMemoryBlobAdapter();
 }
 
 // ... existing code ...
