@@ -123,7 +123,18 @@ export class CatalogueShopperAgent implements ShopperAgent {
       });
       console.log(`[Shopper] Found ${result.items.length} items for "${input.slot.description}"`);
     } catch (err) {
-      console.error(`[Shopper] Search failed for "${input.slot.description}":`, err);
+      console.error(`[Shopper] CRITICAL: Search failed for query "${input.slot.description}".`);
+      console.error(`[Shopper] Error details:`, err);
+      if (err instanceof Error) {
+        console.error(`[Shopper] Error Name: ${err.name}`);
+        console.error(`[Shopper] Error Message: ${err.message}`);
+        console.error(`[Shopper] Stack Trace: ${err.stack}`);
+      }
+      // If it's a Zod error (common in normalization), log the issues
+      if (err && typeof err === 'object' && 'issues' in err) {
+        console.error(`[Shopper] Validation Issues:`, JSON.stringify((err as any).issues, null, 2));
+      }
+      
       // Connector outage degrades to "nothing found" rather than killing the
       // turn (NFR-5). The gap still registers as a demand signal, and the
       // degradation is surfaced so observability sees the outage.
