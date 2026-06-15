@@ -68,7 +68,11 @@ export class HttpMcpClient implements McpClient {
   private rpcId = 0;
 
   constructor(opts: HttpMcpClientOptions) {
-    this.baseUrl = opts.baseUrl.replace(/\/+$/, "");
+    let base = opts.baseUrl.replace(/\/+$/, "");
+    if (!base.startsWith("http://") && !base.startsWith("https://")) {
+      base = `https://${base}`;
+    }
+    this.baseUrl = base;
     this.protocol = opts.protocol ?? "jsonrpc";
     this.rpcPath = opts.rpcPath ?? "";
     this.apiKey = opts.apiKey;
