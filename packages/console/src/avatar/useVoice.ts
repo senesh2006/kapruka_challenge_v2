@@ -149,12 +149,13 @@ export function useVoice(): UseVoiceResult {
       cancelSpeak();
 
       const lang = BCP47[locale];
+      const langPrefix = lang.split("-")[0] ?? "en";
       const voices = typeof window !== "undefined" ? window.speechSynthesis.getVoices() : [];
-      const hasNativeVoice = voices.some((v) => v.lang === lang || v.lang.startsWith(lang.split("-")[0]));
+      const hasNativeVoice = voices.some((v) => v.lang === lang || v.lang.startsWith(langPrefix));
 
       // Fallback for Sinhala or if no native voice found
       if (locale === "si" || !hasNativeVoice) {
-        const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${lang.split("-")[0]}&client=tw-ob`;
+        const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${langPrefix}&client=tw-ob`;
         const audio = new Audio(url);
         audioRef.current = audio;
 
