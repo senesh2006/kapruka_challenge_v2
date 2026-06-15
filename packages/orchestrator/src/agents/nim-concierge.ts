@@ -48,6 +48,21 @@ const BriefToolArgsSchema = z.object({
     )
     .min(1)
     .max(3),
+  cartActions: z
+    .array(
+      z.discriminatedUnion("action", [
+        z.object({
+          action: z.literal("add"),
+          productId: z.string(),
+          quantity: z.number().int().positive().default(1),
+        }),
+        z.object({
+          action: z.literal("remove"),
+          productId: z.string(),
+        }),
+      ]),
+    )
+    .default([]),
 });
 
 const SET_BRIEF_TOOL: ToolDefinition = {
@@ -57,7 +72,8 @@ const SET_BRIEF_TOOL: ToolDefinition = {
     description:
       "Record the structured shopping brief extracted from the customer's message. " +
       "Detect the language the customer wrote in (en, si, ta, or tanglish). " +
-      "Break the need into 1-3 intent slots, each one a distinct thing to shop for.",
+      "Break the need into 1-3 intent slots, each one a distinct thing to shop for. " +
+      "Also record any explicit cart actions (adding or removing specific items).",
     parameters: {
       type: "object",
       properties: {
@@ -79,6 +95,18 @@ const SET_BRIEF_TOOL: ToolDefinition = {
             required: ["id", "description"],
           },
         },
+        cartActions: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              action: { type: "string", enum: ["add", "remove"] },
+              productId: { type: "string" },
+              quantity: { type: "number", minimum: 1 },
+            },
+            required: ["action", "productId"],
+          },
+        },
       },
       required: ["detectedLocale", "situation", "slots"],
     },
@@ -97,7 +125,7 @@ const LOCALE_NAME: Record<Locale, string> = {
  *
  * - `read` runs a tool-calling reasoning call to extract the working brief:
  *   language, situation + emotion, recipient, destination, date, budget,
- *   and 1-3 intent slots (FR-1).
+ *   1-3 intent slots (FR-1), and any cart actions.
  * - `present` runs a plain reasoning call that renders the plan in the
  *   tenant persona with a point of view (FR-2). The prompt pins the model
  *   to the items in the plan — no invented products or prices (FR-4) — and
@@ -129,7 +157,9 @@ export class NimConciergeAgent implements ConciergeAgent {
                   `You are ${input.persona.brandVoice || "Hari"}, a situation-reading shopping concierge ` +
                   `for a Sri Lankan retailer. Read the customer's message including emotional subtext. ` +
                   `Languages you support: ${input.persona.languages.map((l) => LOCALE_NAME[l]).join(", ")}. ` +
-                  `Call set_brief exactly once with the structured brief.` +
+                  `Current Cart: ${JSON.stringify(input.session.cart || [])}. ` +
+                  `Call set_brief exactly once with the structured brief. ` +
+                  `If the customer asks to "add this to cart" or "remove that", record it in cartActions.` +
                   (input.previousBrief
                     ? ` The conversation already has a brief (situation: "${input.previousBrief.situation}"); ` +
                       `merge the new message into it rather than starting over.`
@@ -158,6 +188,7 @@ export class NimConciergeAgent implements ConciergeAgent {
           situation: parsed.situation,
           detectedLocale: parsed.detectedLocale,
           slots,
+          cartActions: parsed.cartActions,
           ...(parsed.recipient !== undefined ? { recipient: parsed.recipient } : {}),
           ...(parsed.destination !== undefined ? { destination: parsed.destination } : {}),
           ...(parsed.occasionDate !== undefined ? { occasionDate: parsed.occasionDate } : {}),
@@ -182,7 +213,11 @@ export class NimConciergeAgent implements ConciergeAgent {
     const top = topPicks(input.plan);
     const cardRefs = top.map((c) => String(c.product.id));
 
-    if (top.length === 0) {
+    const cartSummary = (input.plan.cart || [])
+      .map((item) => `${item.quantity}x ${item.productId}`)
+      .join(", ");
+
+    if (top.length === 0 && (input.plan.cart || []).length === 0) {
       // Nothing to present — an honest ask costs no model call.
       return {
         reply:
@@ -215,7 +250,9 @@ export class NimConciergeAgent implements ConciergeAgent {
                     ? `Your standing opinions: ${input.persona.opinions.join(" / ")}. `
                     : "") +
                   `Reply in ${LOCALE_NAME[input.locale]}. ` +
+                  `Current Cart: ${cartSummary || "empty"}. ` +
                   `Goal: Enthusiastically present the recommendations, explaining why they are the perfect fit for the situation. ` +
+                  `If the user just added something to the cart, acknowledge it warmly. ` +
                   `Be persuasive and encourage the customer to complete their gift set. ` +
                   `STRICT RULES: mention ONLY the items listed below, use ONLY the listed prices, ` +
                   `never invent products, prices, or availability. No pressure tactics, just genuine enthusiasm and helpfulness. ` +
@@ -242,8 +279,9 @@ export class NimConciergeAgent implements ConciergeAgent {
       // Model down — fall back to a plain, grounded rendering plus the
       // gateway's graceful note. Items and prices still come from the plan.
       const plain = top.map((c) => `· ${c.product.title} — ${c.reason}`).join("\n");
+      const cartNote = cartSummary ? `\n\nYour cart: ${cartSummary}` : "";
       return {
-        reply: `${this.model.gracefulMessage()}\n${plain}`,
+        reply: `${this.model.gracefulMessage()}\n${plain}${cartNote}`,
         cardRefs,
       };
     }

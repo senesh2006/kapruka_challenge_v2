@@ -136,7 +136,46 @@ export class Orchestrator {
         locale: initialBrief.detectedLocale,
       });
       let brief = initialBrief;
-      let plan = emptyPlan(brief);
+      let plan: CandidatePlan = {
+        ...emptyPlan(brief),
+        cart: input.session.cart || [],
+      };
+
+      // 2b. Apply cart actions from the brief to the current session/plan.
+      if (brief.cartActions && brief.cartActions.length > 0) {
+        const nextCart = [...plan.cart];
+        for (const action of brief.cartActions) {
+          if (action.action === "add") {
+            // Find if product already in cart to increment quantity, or add new.
+            // Since we don't have the full ProductSummary here, we'll need to
+            // rely on the Shopper or a lookup if we wanted unitPrice. For now,
+            // we'll use a placeholder unitPrice if not found, or update handleTurn
+            // in api/turn.ts to fill it. Actually, for a streamlined flow,
+            // we should probably let the Concierge provide the price if it
+            // just recommended it.
+            const existing = nextCart.find((item) => item.productId === action.productId);
+            if (existing) {
+              existing.quantity += action.quantity;
+            } else {
+              // We need unitPrice to satisfy CartLineSchema.
+              // We look for it in the prior round's candidates or the current one.
+              const candidate = Object.values(plan.candidatesBySlot)
+                .flat()
+                .find((c) => String(c.product.id) === action.productId);
+              
+              nextCart.push({
+                productId: action.productId,
+                quantity: action.quantity,
+                unitPrice: candidate?.product.price || { amount: 0, currency: "LKR" },
+              });
+            }
+          } else if (action.action === "remove") {
+            const idx = nextCart.findIndex((item) => item.productId === action.productId);
+            if (idx !== -1) nextCart.splice(idx, 1);
+          }
+        }
+        plan.cart = nextCart;
+      }
 
       // 3. Multi-agent loop: gather → assemble → critique → refine (capped).
       let round = 0;
