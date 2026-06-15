@@ -269,6 +269,7 @@ export async function bootstrap() {
   );
   bindOrchestratorLogging(orchestrator, logger);
   logger.info("sevana.bootstrap", {
+    version: "v1.0.4-protocol-fix",
     blob: process.env.BLOB_READ_WRITE_TOKEN ? "vercel" : "in-memory",
     webhookSecret: process.env.WEBHOOK_SECRET ? "configured" : "missing",
     concierge: process.env.NIM_API_KEY ? "nim" : "stub",
