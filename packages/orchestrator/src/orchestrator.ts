@@ -153,7 +153,7 @@ export class Orchestrator {
             // in api/turn.ts to fill it. Actually, for a streamlined flow,
             // we should probably let the Concierge provide the price if it
             // just recommended it.
-            const existing = nextCart.find((item) => item.productId === action.productId);
+            const existing = nextCart.find((item) => item.productId === action.productId as any);
             if (existing) {
               existing.quantity += action.quantity;
             } else {
@@ -164,13 +164,13 @@ export class Orchestrator {
                 .find((c) => String(c.product.id) === action.productId);
               
               nextCart.push({
-                productId: action.productId,
+                productId: action.productId as any,
                 quantity: action.quantity,
                 unitPrice: candidate?.product.price || { amount: 0, currency: "LKR" },
               });
             }
           } else if (action.action === "remove") {
-            const idx = nextCart.findIndex((item) => item.productId === action.productId);
+            const idx = nextCart.findIndex((item) => item.productId === action.productId as any);
             if (idx !== -1) nextCart.splice(idx, 1);
           }
         }
