@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import type { ConciergeEmotion } from "@sevana/channels";
-import { EmojiAvatar } from "./EmojiAvatar.js";
+import { BlobAvatar } from "./BlobAvatar.js";
 
 // Lazy — the Lottie player (~85 KB gzip) only loads when JSON assets are
 // actually present, so the default SVG-only path stays light.
@@ -49,7 +49,7 @@ export function AvatarStage(props: AvatarStageProps) {
 
   if (mode === "lottie") {
     return (
-      <Suspense fallback={<EmojiAvatar {...props} />}>
+      <Suspense fallback={<BlobAvatar {...props} />}>
         <CharacterLottie
           emotion={props.emotion}
           speaking={props.speaking}
@@ -60,9 +60,9 @@ export function AvatarStage(props: AvatarStageProps) {
       </Suspense>
     );
   }
-  // Probing or emoji — render the SVG face. (Showing the emoji while we probe
+  // Probing or blob — render the gradient blob. (Showing the blob while we probe
   // is preferable to a blank stage; the swap is instant on cache-hit anyway.)
-  return <EmojiAvatar {...props} />;
+  return <BlobAvatar {...props} />;
 }
 
 /**

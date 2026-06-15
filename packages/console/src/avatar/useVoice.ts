@@ -75,6 +75,8 @@ export function useVoice(): UseVoiceResult {
   const [interim, setInterim] = useState("");
   const [speechPulse, setSpeechPulse] = useState(0);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const pulseIntervalRef = useRef<number | null>(null);
   const onFinalRef = useRef<((text: string) => void) | null>(null);
 
   const sttSupported = getRecognitionCtor() !== null;
@@ -128,41 +130,87 @@ export function useVoice(): UseVoiceResult {
 
   const cancelSpeak = useCallback(() => {
     if (ttsSupported) window.speechSynthesis.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+    }
+    if (pulseIntervalRef.current) {
+      clearInterval(pulseIntervalRef.current);
+      pulseIntervalRef.current = null;
+    }
     setSpeaking(false);
   }, [ttsSupported]);
 
   const speak = useCallback(
     (text: string, locale: LocaleHint) => {
-      if (!ttsSupported || !text.trim()) return;
-      window.speechSynthesis.cancel();
+      if (!text.trim()) return;
+
+      // Cancel any current speaking
+      cancelSpeak();
+
+      const lang = BCP47[locale];
+      const voices = typeof window !== "undefined" ? window.speechSynthesis.getVoices() : [];
+      const hasNativeVoice = voices.some((v) => v.lang === lang || v.lang.startsWith(lang.split("-")[0]));
+
+      // Fallback for Sinhala or if no native voice found
+      if (locale === "si" || !hasNativeVoice) {
+        const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${lang.split("-")[0]}&client=tw-ob`;
+        const audio = new Audio(url);
+        audioRef.current = audio;
+
+        audio.onplay = () => {
+          setSpeaking(true);
+          // Simulate mouth pulse for audio fallback
+          pulseIntervalRef.current = window.setInterval(() => {
+            setSpeechPulse((p) => p + 1);
+          }, 200);
+        };
+        audio.onended = () => {
+          setSpeaking(false);
+          if (pulseIntervalRef.current) {
+            clearInterval(pulseIntervalRef.current);
+            pulseIntervalRef.current = null;
+          }
+        };
+        audio.onerror = () => {
+          setSpeaking(false);
+          if (pulseIntervalRef.current) {
+            clearInterval(pulseIntervalRef.current);
+            pulseIntervalRef.current = null;
+          }
+        };
+
+        audio.play().catch(() => setSpeaking(false));
+        return;
+      }
+
+      // Native SpeechSynthesis
+      if (!ttsSupported) return;
       const utt = new SpeechSynthesisUtterance(text);
-      utt.lang = BCP47[locale];
+      utt.lang = lang;
       utt.rate = 1.0;
       utt.pitch = 1.05;
-      // Prefer a voice matching the language if one exists.
-      const voices = window.speechSynthesis.getVoices();
+
       const match = voices.find((v) => v.lang === utt.lang) ?? voices.find((v) => v.lang.startsWith(locale === "tanglish" ? "en" : locale));
       if (match) utt.voice = match;
+
       utt.onstart = () => setSpeaking(true);
       utt.onend = () => setSpeaking(false);
       utt.onerror = () => setSpeaking(false);
-      // Real word-boundary signal — the avatar's mouth pulses on each one.
       utt.onboundary = (e: SpeechSynthesisEvent) => {
         if (e.name === "word") setSpeechPulse((p) => p + 1);
       };
       window.speechSynthesis.speak(utt);
     },
-    [ttsSupported],
+    [ttsSupported, cancelSpeak],
   );
 
   useEffect(() => {
     return () => {
       recognitionRef.current?.abort();
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-      }
+      cancelSpeak();
     };
-  }, []);
+  }, [cancelSpeak]);
 
   return {
     sttSupported,
