@@ -35,7 +35,13 @@ export function ConciergePage() {
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState("");
   const [muted, setMuted] = useState(false);
+  const [locale, setLocale] = useState<LocaleHint>("en");
   const localeRef = useRef<LocaleHint>("en");
+
+  // Keep ref in sync for the callback closures
+  useEffect(() => {
+    localeRef.current = locale;
+  }, [locale]);
 
   const send = useCallback(
     async (message: string) => {
@@ -48,7 +54,10 @@ export function ConciergePage() {
         setReply(res.reply);
         setCards(res.cards);
         setEmotion(res.emotion);
-        if (res.detectedLocale) localeRef.current = res.detectedLocale;
+        // If the backend detected a different locale, sync it
+        if (res.detectedLocale && res.detectedLocale !== locale) {
+          setLocale(res.detectedLocale as LocaleHint);
+        }
         if (!muted) voice.speak(res.reply, localeRef.current);
       } catch (err) {
         setReply(err instanceof Error ? err.message : String(err));
@@ -57,7 +66,7 @@ export function ConciergePage() {
         setBusy(false);
       }
     },
-    [busy, client, muted, voice],
+    [busy, client, muted, voice, locale],
   );
 
   const onMic = useCallback(() => {
@@ -80,9 +89,25 @@ export function ConciergePage() {
 
       {/* Single column, centered. */}
       <div className="relative mx-auto flex min-h-screen max-w-2xl flex-col items-center px-5 py-8 sm:py-12">
-        {/* Top — mute toggle only. No nav, no dashboard. */}
+        {/* Top — nav & mute toggle. */}
         <header className="flex w-full items-center justify-between">
-          <span className="text-sm font-medium tracking-wide text-foreground/70">Hari</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium tracking-wide text-foreground/70">Hari</span>
+            <div className="flex gap-1 rounded-full bg-black/5 p-1">
+              {(["en", "si", "ta"] as const).map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setLocale(l)}
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase transition-all",
+                    locale === l ? "bg-white text-black shadow-sm" : "text-foreground/40 hover:text-foreground/60"
+                  )}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
           <button
             type="button"
             onClick={() => setMuted((m) => !m)}
@@ -94,8 +119,8 @@ export function ConciergePage() {
         </header>
 
         {/* Avatar */}
-        <div className="mt-2 flex w-full justify-center">
-          <div className="h-56 w-56 sm:h-72 sm:w-72">
+        <div className="mt-8 flex w-full justify-center overflow-visible">
+          <div className="relative h-64 w-64 sm:h-80 sm:w-80 overflow-visible flex items-center justify-center">
             <AvatarStage
               emotion={emotion}
               speaking={voice.speaking}
