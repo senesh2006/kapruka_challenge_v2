@@ -241,12 +241,11 @@ export function demoTenant(): Tenant {
  * stub-equivalent behaviour internally if the gateway fails at runtime.
  */
 function buildConcierge(): ConciergeAgent {
-  const apiKey = process.env.NIM_API_KEY;
-  if (!apiKey) return new StubConciergeAgent();
+  const apiKey = process.env.NIM_API_KEY || "unneeded";
   const router = new ModelRouter();
   for (const profile of DEFAULT_NIM_PROFILES) router.register(profile);
   const client = new NimClient({
-    baseUrl: process.env.NIM_BASE_URL ?? "https://integrate.api.nvidia.com/v1",
+    baseUrl: process.env.NIM_BASE_URL || "https://integrate.api.nvidia.com/v1",
     apiKey,
     timeoutMs: 25_000,
   });
@@ -268,8 +267,7 @@ function buildConcierge(): ConciergeAgent {
  * previews working.
  */
 async function buildRetailerConnector(tenant: Tenant): Promise<RetailerConnector> {
-  const baseUrl = process.env.KAPRUKA_MCP_BASE_URL;
-  if (!baseUrl) return demoConnector();
+  const baseUrl = process.env.KAPRUKA_MCP_BASE_URL || "https://mcp.kapruka.com";
   // Wire format is env-tunable so we can match the real Kapruka MCP without a
   // code change: KAPRUKA_MCP_PROTOCOL = "jsonrpc" (default, standard MCP) |
   // "rest"; KAPRUKA_MCP_PATH = the JSON-RPC endpoint suffix (default "").
