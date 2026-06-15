@@ -58,6 +58,21 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      keyframes: {
+        "blob-slow": {
+          "0%, 100%": { transform: "translate(0, 0) scale(1) rotate(0deg)" },
+          "33%": { transform: "translate(10px, -10px) scale(1.05) rotate(3deg)" },
+          "66%": { transform: "translate(-10px, 10px) scale(0.95) rotate(-3deg)" },
+        },
+        "blob-fast": {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)" },
+          "50%": { transform: "translate(0, 0) scale(1.1)" },
+        },
+      },
+      animation: {
+        "blob-slow": "blob-slow 8s infinite ease-in-out",
+        "blob-fast": "blob-fast 0.3s infinite ease-in-out",
+      },
     },
   },
   plugins: [],
