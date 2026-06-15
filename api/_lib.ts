@@ -109,9 +109,8 @@ async function buildAdapter(): Promise<BlobStorageAdapter> {
 const NOW_ISO = () => new Date().toISOString();
 
 /** Adapter the tenant binds to: real Kapruka MCP when configured, demo otherwise. */
-function activeAdapter(): "kapruka" | "demo" {
-  // Use real Kapruka if the base URL is provided, otherwise stay on demo.
-  return process.env.KAPRUKA_MCP_BASE_URL ? "kapruka" : "demo";
+function activeAdapter(): "kapruka" {
+  return "kapruka";
 }
 
 export function demoTenant(): Tenant {
@@ -179,11 +178,11 @@ function buildConcierge(): ConciergeAgent {
  */
 async function buildRetailerConnector(tenant: Tenant): Promise<RetailerConnector> {
   const baseUrl = process.env.KAPRUKA_MCP_BASE_URL || "https://mcp.kapruka.com";
-  // Wire format is env-tunable so we can match the real Kapruka MCP without a
-  // code change: KAPRUKA_MCP_PROTOCOL = "jsonrpc" (default, standard MCP) |
-  // "rest"; KAPRUKA_MCP_PATH = the JSON-RPC endpoint suffix (default "").
   const protocol = process.env.KAPRUKA_MCP_PROTOCOL === "rest" ? "rest" : "jsonrpc";
   const rpcPath = process.env.KAPRUKA_MCP_PATH ?? "";
+  
+  console.log(`[Connector] Building retailer connector for ${tenant.id} using ${baseUrl} (${protocol})`);
+
   const registry = new ConnectorRegistry();
   registerKaprukaAdapter(registry, {
     buildClient: (credential) =>

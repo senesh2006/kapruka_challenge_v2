@@ -159,6 +159,9 @@ export class HttpMcpClient implements McpClient {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
+      console.log(`[HttpMcpClient] Calling tool "${toolName}" at: ${url}`);
+      console.log(`[HttpMcpClient] Request body:`, JSON.stringify(body));
+      
       const response = await this.fetchImpl(url, {
         method: "POST",
         headers: {
@@ -171,6 +174,8 @@ export class HttpMcpClient implements McpClient {
         signal: controller.signal,
       });
       const raw = await this.readBody(response);
+      console.log(`[HttpMcpClient] Response status: ${response.status}`);
+      
       if (!response.ok) {
         throw new HttpMcpClientError(
           `MCP tool "${toolName}" failed (${response.status})`,
@@ -180,6 +185,7 @@ export class HttpMcpClient implements McpClient {
       }
       return raw;
     } catch (err) {
+      console.error(`[HttpMcpClient] Error in tool "${toolName}":`, err);
       if (err instanceof Error && err.name === "AbortError") {
         throw new HttpMcpClientError(`MCP tool "${toolName}" timed out after ${this.timeoutMs}ms`, 0, null);
       }
