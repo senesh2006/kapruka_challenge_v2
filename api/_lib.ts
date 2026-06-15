@@ -168,7 +168,7 @@ function demoConnector(): RetailerConnector {
       getProduct: async (id: unknown) =>
         (DEMO_CATALOGUE.find((i) => i.id === String(id)) ?? null) as never,
       listCategories: async () =>
-        [...new Set(DEMO_CATALOGUE.flatMap((i) => i.categoryIds))].map((c) => ({ id: c, name: c })) as never,
+        Array.from(new Set(DEMO_CATALOGUE.flatMap((i) => i.categoryIds))).map((c) => ({ id: c, name: c })) as never,
     },
     delivery: {
       kind: "delivery",
