@@ -194,7 +194,10 @@ function buildConcierge(): ConciergeAgent {
  * previews working.
  */
 async function buildRetailerConnector(tenant: Tenant): Promise<RetailerConnector> {
-  const baseUrl = process.env.KAPRUKA_MCP_BASE_URL || "https://mcp.kapruka.com";
+  let baseUrl = process.env.KAPRUKA_MCP_BASE_URL || "https://mcp.kapruka.com";
+  if (!baseUrl.startsWith("http://") && !baseUrl.startsWith("https://")) {
+    baseUrl = `https://${baseUrl}`;
+  }
   const protocol = process.env.KAPRUKA_MCP_PROTOCOL === "rest" ? "rest" : "jsonrpc";
   const rpcPath = process.env.KAPRUKA_MCP_PATH ?? "";
   
