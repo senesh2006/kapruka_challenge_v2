@@ -106,10 +106,12 @@ async function buildAdapter(): Promise<BlobStorageAdapter> {
 
 // ... existing code ...
 
+const NOW_ISO = () => new Date().toISOString();
+
 /** Adapter the tenant binds to: real Kapruka MCP when configured, demo otherwise. */
 function activeAdapter(): "kapruka" | "demo" {
-  // Hardcoded to demo to prevent Cloudflare bot blocks and missing env var issues.
-  return "demo";
+  // Use real Kapruka if the base URL is provided, otherwise stay on demo.
+  return process.env.KAPRUKA_MCP_BASE_URL ? "kapruka" : "demo";
 }
 
 export function demoTenant(): Tenant {
