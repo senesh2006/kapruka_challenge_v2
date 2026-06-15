@@ -150,10 +150,23 @@ export function useVoice(): UseVoiceResult {
 
       const lang = BCP47[locale];
       const langPrefix = lang.split("-")[0] ?? "en";
+      
       const voices = typeof window !== "undefined" ? window.speechSynthesis.getVoices() : [];
-      const hasNativeVoice = voices.some((v) => v.lang === lang || v.lang.startsWith(langPrefix));
+      
+      // High-quality neural voice hunt
+      // 1. Edge "Natural" voices are the best free voices available.
+      // 2. Chrome "Google" voices are the next best.
+      const match = voices.find((v) => v.lang === lang && v.name.includes("Online (Natural)")) 
+                 ?? voices.find((v) => v.lang.startsWith(langPrefix) && v.name.includes("Online (Natural)"))
+                 ?? voices.find((v) => v.lang === lang && v.name.startsWith("Google"))
+                 ?? voices.find((v) => v.lang.startsWith(langPrefix) && v.name.startsWith("Google"))
+                 ?? voices.find((v) => v.lang === lang)
+                 ?? voices.find((v) => v.lang.startsWith(langPrefix));
 
-      // Fallback for Sinhala or if no native voice found
+      const hasNativeVoice = !!match && (match.name.includes("Online (Natural)") || match.name.startsWith("Google"));
+
+      // Fallback for Sinhala (which usually doesn't have a high-quality native voice in browsers) 
+      // or if no high-quality native voice found.
       if (locale === "si" || !hasNativeVoice) {
         const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${langPrefix}&client=tw-ob`;
         const audio = new Audio(url);
@@ -185,15 +198,13 @@ export function useVoice(): UseVoiceResult {
         return;
       }
 
-      // Native SpeechSynthesis
+      // Native SpeechSynthesis with high-quality voice
       if (!ttsSupported) return;
       const utt = new SpeechSynthesisUtterance(text);
       utt.lang = lang;
-      utt.rate = 1.0;
-      utt.pitch = 1.05;
-
-      const match = voices.find((v) => v.lang === utt.lang) ?? voices.find((v) => v.lang.startsWith(locale === "tanglish" ? "en" : locale));
-      if (match) utt.voice = match;
+      utt.rate = 0.95; // Slightly slower for better naturalness
+      utt.pitch = 1.0;
+      utt.voice = match;
 
       utt.onstart = () => setSpeaking(true);
       utt.onend = () => setSpeaking(false);
@@ -207,6 +218,11 @@ export function useVoice(): UseVoiceResult {
   );
 
   useEffect(() => {
+    // Force a voice list refresh for browsers that load them async (Chrome/Edge)
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.getVoices();
+    }
+    
     return () => {
       recognitionRef.current?.abort();
       cancelSpeak();
