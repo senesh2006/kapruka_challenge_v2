@@ -114,13 +114,16 @@ export class CatalogueShopperAgent implements ShopperAgent {
     let result;
     try {
       const connector = await this.connectorFor(input.tenant);
+      console.log(`[Shopper] Searching for: "${input.slot.description}" (slot: ${input.slot.id})`);
       result = await connector.catalogue.searchProducts({
         query: input.slot.description,
         ...(input.slot.categoryHints.length > 0 ? { categoryIds: input.slot.categoryHints } : {}),
         ...(input.brief.detectedLocale !== "tanglish" ? { locale: input.brief.detectedLocale } : {}),
         limit: 12,
       });
+      console.log(`[Shopper] Found ${result.items.length} items for "${input.slot.description}"`);
     } catch (err) {
+      console.error(`[Shopper] Search failed for "${input.slot.description}":`, err);
       // Connector outage degrades to "nothing found" rather than killing the
       // turn (NFR-5). The gap still registers as a demand signal, and the
       // degradation is surfaced so observability sees the outage.
