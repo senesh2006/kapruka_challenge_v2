@@ -220,16 +220,6 @@ export class NimConciergeAgent implements ConciergeAgent {
       .map((item) => `${item.quantity}x ${item.productId}`)
       .join(", ");
 
-    if (top.length === 0 && (input.plan.cart || []).length === 0) {
-      // Nothing to present — an honest ask costs no model call.
-      return {
-        reply:
-          "I couldn't find anything in the catalogue that fits yet — tell me a little more " +
-          "about the occasion or the person, and I'll look again.",
-        cardRefs,
-      };
-    }
-
     const itemLines = top
       .map(
         (c) =>
@@ -258,6 +248,7 @@ export class NimConciergeAgent implements ConciergeAgent {
                   `IMPORTANT: If you don't have enough information about the recipient or occasion yet, DO NOT present these recommendations as final. ` +
                   `Instead, ask thoughtful follow-up questions to understand the person better (interests, profession, allergies, things they dislike). ` +
                   `When you DO recommend, explain exactly why each item fits the recipient's personality and the emotional context of the gift. ` +
+                  `If NO items are listed below, apologize warmly and explain that you need more information to make a truly meaningful suggestion. ` +
                   `STRICT RULES: mention ONLY the items listed below, use ONLY the listed prices. ` +
                   `Keep it under 150 words.`,
               },
@@ -265,7 +256,7 @@ export class NimConciergeAgent implements ConciergeAgent {
                 role: "user",
                 content:
                   `Situation: ${input.plan.brief.situation}\n` +
-                  `Items to present:\n${itemLines}\n` +
+                  `Items to present:\n${itemLines.length > 0 ? itemLines : "(No items found yet - ask more questions)"}\n` +
                   deliveryLine(input.plan.delivery),
               },
             ],
@@ -281,6 +272,12 @@ export class NimConciergeAgent implements ConciergeAgent {
     } catch {
       // Model down — fall back to a plain, grounded rendering plus the
       // gateway's graceful note. Items and prices still come from the plan.
+      if (top.length === 0) {
+        return {
+          reply: "I'm sorry, I'm having a bit of trouble connecting to my catalogue right now. Could you tell me more about who the gift is for while I look into it?",
+          cardRefs: [],
+        };
+      }
       const plain = top.map((c) => `· ${c.product.title} — ${c.reason}`).join("\n");
       const cartNote = cartSummary ? `\n\nYour cart: ${cartSummary}` : "";
       return {
