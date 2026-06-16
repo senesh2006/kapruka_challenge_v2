@@ -57,7 +57,7 @@ async function flush(rounds = 8): Promise<void> {
 
 const now = "2026-06-05T10:00:00.000Z";
 
-function fakeClient(responses: Record<string, unknown | ((args: unknown) => unknown)>) {
+function fakeClient(responses: Record<string, unknown | ((args: any) => unknown)>) {
   const calls: Array<{ name: string; args: unknown; at: number }> = [];
   const clock = { current: 0 };
   const client: McpClient = {
@@ -67,7 +67,9 @@ function fakeClient(responses: Record<string, unknown | ((args: unknown) => unkn
         throw new Error(`unexpected tool call: ${name}`);
       }
       const v = responses[name];
-      return typeof v === "function" ? (v as (a: unknown) => unknown)(args) : v;
+      // Unwrap 'params' if present before passing to the response handler
+      const unwrappedArgs = (args && typeof args === 'object' && 'params' in args) ? args.params : args;
+      return typeof v === "function" ? (v as (a: unknown) => unknown)(unwrappedArgs) : v;
     }),
   };
   return { client, calls };

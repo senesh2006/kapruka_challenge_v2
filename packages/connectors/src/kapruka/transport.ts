@@ -117,7 +117,8 @@ export class KaprukaTransport {
       try {
         await this.rateLimiter.acquire(toolName);
         this.fault.beforeRealCall();
-        return await this.client.callTool<T>(toolName, args);
+        // Kapruka tools expect all arguments to be nested under a 'params' field.
+        return await this.client.callTool<T>(toolName, { params: args });
       } catch (err) {
         if (err instanceof KaprukaOutageError) throw err;
         if (attempt >= this.retry.maxAttempts) throw err;
