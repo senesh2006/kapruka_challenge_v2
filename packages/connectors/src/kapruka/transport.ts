@@ -133,6 +133,12 @@ export class KaprukaTransport {
 function isRetryable(err: unknown): boolean {
   if (err instanceof KaprukaTransientError) return true;
   if (err instanceof Error && err.name === "ZodError") return false;
+  // A tool that returned isError:true is a deterministic application error
+  // (bad args, validation, no such product) — retrying just burns backoff
+  // cycles and latency. The HttpMcpClient tags these with `toolError`.
+  if (err && typeof err === "object" && (err as { toolError?: boolean }).toolError === true) {
+    return false;
+  }
   // Default to retryable: network / timeout / 5xx / 429 surface as generic
   // Errors from real transports; validation errors are explicitly excluded
   // above so we don't retry a malformed payload.

@@ -164,7 +164,24 @@ export class HttpMcpClient implements McpClient {
     const result = env?.result;
     if (!result) return raw as TResult;
     if (result.isError) {
-      throw new HttpMcpClientError(`MCP tool "${name}" reported isError`, 0, result);
+      // The MCP spec carries the human-readable failure reason inside the
+      // content block(s). Surface it so logs show WHAT the tool complained
+      // about (bad arg name, missing field, …) instead of an opaque
+      // "isError". `toolError` is a non-retryable flag so the transport
+      // doesn't waste backoff cycles on a deterministic application error.
+      const detail = (result.content ?? [])
+        .map((c) => c?.text)
+        .filter((t): t is string => typeof t === "string")
+        .join(" ")
+        .trim();
+      console.error(`[HttpMcpClient] "${name}" reported isError: ${detail || "(no content text)"}`);
+      const err = new HttpMcpClientError(
+        `MCP tool "${name}" failed: ${detail || "tool reported isError with no detail"}`,
+        0,
+        result,
+      );
+      (err as HttpMcpClientError & { toolError?: boolean }).toolError = true;
+      throw err;
     }
     if (result.structuredContent !== undefined) return result.structuredContent as TResult;
     const text = result.content?.find((c) => c.type === "text")?.text;

@@ -298,16 +298,44 @@ describe("HttpMcpClient — jsonrpc wire format", () => {
     await expect(client.callTool("x", {})).rejects.toThrow(/method not found/);
   });
 
-  it("throws when the tool result reports isError", async () => {
+  it("surfaces the tool error content text when isError is set", async () => {
     const fetchImpl = vi.fn(async () =>
-      jsonResponse({ jsonrpc: "2.0", id: 1, result: { isError: true, content: [] } }),
+      jsonResponse({
+        jsonrpc: "2.0",
+        id: 1,
+        result: {
+          isError: true,
+          content: [{ type: "text", text: "Invalid argument: 'locale' is not supported" }],
+        },
+      }),
     );
     const client = new HttpMcpClient({
       baseUrl: "https://mcp.example.com",
       skipHandshake: true,
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
-    await expect(client.callTool("x", {})).rejects.toThrow(/isError/);
+    await expect(client.callTool("x", {})).rejects.toThrow(/Invalid argument.*locale/);
+  });
+
+  it("tags a tool-error so the transport can skip retrying it", async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        jsonrpc: "2.0",
+        id: 1,
+        result: { isError: true, content: [{ type: "text", text: "nope" }] },
+      }),
+    );
+    const client = new HttpMcpClient({
+      baseUrl: "https://mcp.example.com",
+      skipHandshake: true,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    try {
+      await client.callTool("x", {});
+      throw new Error("expected throw");
+    } catch (err) {
+      expect((err as { toolError?: boolean }).toolError).toBe(true);
+    }
   });
 
   it("advertises both json and event-stream in Accept", async () => {
