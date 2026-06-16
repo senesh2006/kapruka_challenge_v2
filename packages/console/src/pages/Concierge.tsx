@@ -8,6 +8,7 @@ import {
 import { AvatarStage } from "../avatar/AvatarStage.js";
 import { useVoice } from "../avatar/useVoice.js";
 import { cn } from "../lib/cn.js";
+import { Skiper39 } from "../components/CrowdCanvas.js";
 
 type LocaleHint = "en" | "si" | "ta" | "tanglish";
 
@@ -85,6 +86,7 @@ export function ConciergePage() {
         <div className="absolute -left-20 top-20 h-72 w-72 rounded-full bg-amber-200/40 blur-3xl" />
         <div className="absolute -right-24 top-60 h-80 w-80 rounded-full bg-rose-200/30 blur-3xl" />
         <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-yellow-200/40 blur-3xl" />
+        {busy && <Skiper39 />}
       </div>
 
       {/* Single column, centered. */}
