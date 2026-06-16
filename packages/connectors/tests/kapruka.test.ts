@@ -177,7 +177,7 @@ describe("Kapruka catalogue connector", () => {
   it("getProduct caches by id under the product TTL", async () => {
     const vc = new VirtualClock();
     const { client } = fakeClient({
-      kapruka_get_product: (args) => kaprukaProduct((args as { id: string }).id),
+      kapruka_get_product: (args) => kaprukaProduct((args as { product_id: string }).product_id),
     });
     const transport = new KaprukaTransport({ client, clock: vc });
     const cat = createKaprukaCatalogueConnector(transport);
@@ -243,9 +243,9 @@ describe("Kapruka rate limiting", () => {
       rateLimit: { perMinute: 2, orderCreationsPerHour: 9999 },
     });
 
-    const p1 = transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: "a" });
-    const p2 = transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: "b" });
-    const p3 = transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: "c" });
+    const p1 = transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: "a" });
+    const p2 = transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: "b" });
+    const p3 = transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: "c" });
 
     await flush();
     expect(client.callTool).toHaveBeenCalledTimes(2);
@@ -291,9 +291,9 @@ describe("Kapruka rate limiting", () => {
       rateLimit: { perMinute: 9999, orderCreationsPerHour: 1 },
     });
 
-    await transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: "a" });
-    await transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: "b" });
-    await transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: "c" });
+    await transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: "a" });
+    await transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: "b" });
+    await transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: "c" });
 
     expect(client.callTool).toHaveBeenCalledTimes(3);
   });
@@ -310,7 +310,7 @@ describe("Kapruka exponential backoff", () => {
     });
     transport.fault.setFailNext(2);
 
-    const p = transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: "x" });
+    const p = transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: "x" });
     await vc.advance(2_000);
     await p;
 
@@ -327,7 +327,7 @@ describe("Kapruka exponential backoff", () => {
     });
     transport.fault.setFailNext(5);
 
-    const p = transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: "x" });
+    const p = transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: "x" });
     await vc.advance(1_000);
     await expect(p).rejects.toThrow(/transient/i);
     expect(client.callTool).not.toHaveBeenCalled();
@@ -343,7 +343,7 @@ describe("Kapruka fault injection — simulated outage", () => {
     });
 
     await expect(
-      transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: "x" }),
+      transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: "x" }),
     ).rejects.toBeInstanceOf(KaprukaOutageError);
     expect(client.callTool).not.toHaveBeenCalled();
   });
@@ -371,13 +371,13 @@ describe("Kapruka fault injection — simulated outage", () => {
     });
 
     for (let i = 0; i < 5; i++) {
-      await expect(transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: String(i) })).rejects.toBeInstanceOf(
+      await expect(transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: String(i) })).rejects.toBeInstanceOf(
         KaprukaOutageError,
       );
     }
 
     transport.fault.setOutage(false);
-    expect(await transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: "ok" })).toBeNull();
+    expect(await transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: "ok" })).toBeNull();
   });
 });
 

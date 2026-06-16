@@ -21,13 +21,12 @@ import type { KaprukaTransport } from "./transport.js";
 
 function intentToArgs(intent: SearchIntent): Record<string, unknown> {
   const args: Record<string, unknown> = { limit: intent.limit };
-  if (intent.query !== undefined) args.query = intent.query;
-  if (intent.categoryIds !== undefined) args.category_ids = intent.categoryIds;
-  if (intent.occasion !== undefined) args.occasion = intent.occasion;
-  if (intent.budget?.min !== undefined) args.budget_min = intent.budget.min.amount;
-  if (intent.budget?.max !== undefined) args.budget_max = intent.budget.max.amount;
-  if (intent.attributes !== undefined) args.attributes = intent.attributes;
-  if (intent.locale !== undefined) args.locale = intent.locale;
+  if (intent.query !== undefined) args.q = intent.query;
+  if (intent.categoryIds && intent.categoryIds.length > 0) {
+    args.category = intent.categoryIds[0];
+  }
+  if (intent.budget?.min !== undefined) args.min_price = intent.budget.min.amount;
+  if (intent.budget?.max !== undefined) args.max_price = intent.budget.max.amount;
   if (intent.cursor !== undefined) args.cursor = intent.cursor;
   return args;
 }
@@ -49,7 +48,7 @@ export function createKaprukaCatalogueConnector(
     async getProduct(id: ProductId) {
       const raw = await transport.call(
         KAPRUKA_TOOL_NAMES.catalogue.get,
-        { id: String(id) },
+        { product_id: String(id) },
         {
           cacheKey: `product::${String(id)}`,
           cacheTtlMs: transport.ttls.productTtlMs,
@@ -108,7 +107,7 @@ export function createKaprukaCheckoutConnector(
     },
     async trackOrder(id: OrderId | string) {
       const raw = await transport.call(KAPRUKA_TOOL_NAMES.checkout.track, {
-        id: String(id),
+        order_ref: String(id),
       });
       return normalizeOrderTracking(raw);
     },
