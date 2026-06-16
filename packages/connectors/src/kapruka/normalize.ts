@@ -9,174 +9,198 @@ import type {
   ProductSummary,
   SearchResult,
 } from "../types/index.js";
+import { ProductId } from "@sevana/shared";
 
 /**
- * Raw Kapruka MCP shapes (snake_case) and normalizers that map them onto the
- * canonical Sevana types. If the MCP returns nothing, normalizers return an
- * explicit empty result — never an invented product, price, or status.
+ * Raw Kapruka MCP response schemas (matching the server's JSON output).
+ * The server often wraps the structured JSON inside a string in the 'result' field.
  */
 
-const KaprukaRawProductSummarySchema = z.object({
-  product_id: z.string().min(1),
-  name: z.string(),
-  thumbnail: z.string().url(),
-  price_lkr: z.number().nonnegative(),
-  category_ids: z.array(z.string()).optional(),
-  in_stock: z.boolean().optional(),
+const KaprukaPriceSchema = z.object({
+  amount: z.number(),
+  currency: z.string(),
 });
 
-const KaprukaRawProductSchema = KaprukaRawProductSummarySchema.extend({
+const KaprukaRawProductSummarySchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  summary: z.string().optional(),
+  price: KaprukaPriceSchema,
+  image_url: z.string().url().nullable().optional(),
+  in_stock: z.boolean().optional(),
+  stock_level: z.string().optional(),
+  url: z.string().url(),
+});
+
+const KaprukaRawProductSchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
   description: z.string().optional(),
+  price: KaprukaPriceSchema,
   images: z.array(z.string().url()).optional(),
-  attributes: z
-    .record(z.union([z.string(), z.number(), z.boolean()]))
-    .optional(),
-  perishable: z.boolean().optional(),
+  in_stock: z.boolean().optional(),
+  url: z.string().url(),
+});
+
+const KaprukaRawCategorySchema = z.object({
+  name: z.string(),
+  url: z.string().url(),
+  children: z.lazy(() => z.array(KaprukaRawCategorySchema)).optional(),
 });
 
 const KaprukaRawSearchSchema = z.object({
   results: z.array(KaprukaRawProductSummarySchema).optional(),
-  next_cursor: z.string().optional(),
+  next_cursor: z.string().nullable().optional(),
 });
 
-const KaprukaRawCategorySchema = z.object({
-  category_id: z.string(),
-  name: z.string(),
-  parent_id: z.string().optional(),
-});
-
-const KaprukaRawCategoryListSchema = z.union([
-  z.array(KaprukaRawCategorySchema),
-  z.object({ categories: z.array(KaprukaRawCategorySchema) }),
-]);
-
-const KaprukaRawCitySchema = z.object({
-  city_id: z.string(),
+const KaprukaRawDeliveryCitySchema = z.object({
   name: z.string(),
   aliases: z.array(z.string()).optional(),
-  region: z.string().optional(),
 });
 
 const KaprukaRawDeliveryQuoteSchema = z.object({
   available: z.boolean(),
-  earliest_date: z.string().datetime().optional(),
-  fee_lkr: z.number().nonnegative().optional(),
-  perishable_warnings: z.array(z.string()).optional(),
-  reason: z.string().optional(),
+  rate: z.number().optional(),
+  currency: z.string().optional(),
+  reason: z.string().nullable().optional(),
 });
 
-const KaprukaRawOrderSchema = z.object({
-  order_ref: z.string().min(1),
-  pay_link: z.string().url(),
-  total: z.number().nonnegative(),
-  currency: z.string().length(3),
-});
-
-const KaprukaRawTrackingStepSchema = z.object({
-  status: z.string(),
-  at: z.string().datetime(),
-  notes: z.string().optional(),
+const KaprukaRawOrderConfirmationSchema = z.object({
+  order_ref: z.string(),
+  checkout_url: z.string().url(),
+  summary: z.object({
+    grand_total: z.number(),
+    currency: z.string(),
+  }),
 });
 
 const KaprukaRawTrackingSchema = z.object({
-  order_ref: z.string().min(1),
+  order_number: z.string(),
   status: z.string(),
-  timeline: z.array(KaprukaRawTrackingStepSchema).optional(),
-  pay_link: z.string().url().optional(),
+  progress: z.array(z.object({ step: z.string(), timestamp: z.string() })).optional(),
 });
 
-type KaprukaRawProductSummary = z.infer<typeof KaprukaRawProductSummarySchema>;
-type KaprukaRawProduct = z.infer<typeof KaprukaRawProductSchema>;
-
-function rawSummaryToCanonical(r: KaprukaRawProductSummary): ProductSummary {
-  return {
-    id: r.product_id as ProductSummary["id"],
-    title: r.name,
-    imageUrl: r.thumbnail,
-    price: { amount: r.price_lkr, currency: "LKR" as ProductSummary["price"]["currency"] },
-    categoryIds: r.category_ids ?? [],
-    available: r.in_stock ?? true,
-  };
-}
-
-function rawProductToCanonical(r: KaprukaRawProduct): Product {
-  return {
-    ...rawSummaryToCanonical(r),
-    ...(r.description !== undefined ? { description: r.description } : {}),
-    images: r.images ?? [],
-    attributes: r.attributes ?? {},
-    perishable: r.perishable ?? false,
-  };
+/**
+ * Helper to unwrap the 'result' string wrapper from the MCP server.
+ */
+function unwrap<T>(raw: unknown): T {
+  if (raw !== null && typeof raw === "object" && "result" in raw) {
+    const val = (raw as { result: unknown }).result;
+    if (typeof val === "string") {
+      try {
+        return JSON.parse(val) as T;
+      } catch {
+        // Fallback for non-JSON strings
+        return { result: val } as unknown as T;
+      }
+    }
+    return val as T;
+  }
+  return raw as T;
 }
 
 export function normalizeSearchResult(raw: unknown): SearchResult {
-  if (raw === null || raw === undefined) return { items: [] };
-  const parsed = KaprukaRawSearchSchema.parse(raw);
+  const unwrapped = unwrap<any>(raw);
+  if (!unwrapped || typeof unwrapped !== "object") return { items: [] };
+  
+  // Handle cases where the server returns "No products found..." as a string result
+  if (unwrapped.result && typeof unwrapped.result === "string" && unwrapped.result.includes("No products found")) {
+    return { items: [] };
+  }
+
+  const parsed = KaprukaRawSearchSchema.parse(unwrapped);
   return {
     items: (parsed.results ?? []).map(rawSummaryToCanonical),
-    ...(parsed.next_cursor !== undefined ? { cursor: parsed.next_cursor } : {}),
+    ...(parsed.next_cursor ? { cursor: parsed.next_cursor } : {}),
   };
 }
 
 export function normalizeProduct(raw: unknown): Product | null {
-  if (raw === null || raw === undefined) return null;
-  return rawProductToCanonical(KaprukaRawProductSchema.parse(raw));
+  const unwrapped = unwrap<any>(raw);
+  if (!unwrapped || typeof unwrapped !== "object" || !unwrapped.id) return null;
+  return rawProductToCanonical(KaprukaRawProductSchema.parse(unwrapped));
 }
 
 export function normalizeCategories(raw: unknown): Category[] {
-  if (raw === null || raw === undefined) return [];
-  const parsed = KaprukaRawCategoryListSchema.parse(raw);
-  const arr = Array.isArray(parsed) ? parsed : parsed.categories;
-  return arr.map((c) => ({
-    id: c.category_id,
-    name: c.name,
-    ...(c.parent_id !== undefined ? { parentId: c.parent_id } : {}),
-  }));
+  const unwrapped = unwrap<any>(raw);
+  if (!unwrapped || !unwrapped.categories) return [];
+  const parsed = z.array(KaprukaRawCategorySchema).parse(unwrapped.categories);
+  return parsed.map(rawCategoryToCanonical);
 }
 
 export function normalizeDeliveryCities(raw: unknown): DeliveryCity[] {
-  if (raw === null || raw === undefined) return [];
-  const arr = z.array(KaprukaRawCitySchema).parse(raw);
-  return arr.map((c) => ({
-    id: c.city_id,
+  const unwrapped = unwrap<any>(raw);
+  if (!unwrapped || !unwrapped.cities) return [];
+  const parsed = z.array(KaprukaRawDeliveryCitySchema).parse(unwrapped.cities);
+  return parsed.map((c) => ({
+    id: c.name, // Use name as ID since the server doesn't provide IDs in the JSON
     name: c.name,
     aliases: c.aliases ?? [],
-    ...(c.region !== undefined ? { region: c.region } : {}),
   }));
 }
 
 export function normalizeDeliveryQuote(raw: unknown): DeliveryQuote {
-  if (raw === null || raw === undefined) {
-    return { available: false, perishableWarnings: [], reason: "no response from MCP" };
-  }
-  const r = KaprukaRawDeliveryQuoteSchema.parse(raw);
-  const lkr = "LKR" as ProductSummary["price"]["currency"];
+  const unwrapped = unwrap<any>(raw);
+  if (!unwrapped) return { available: false, reason: "No delivery info returned" };
+  const r = KaprukaRawDeliveryQuoteSchema.parse(unwrapped);
   return {
     available: r.available,
-    ...(r.earliest_date !== undefined ? { earliestDate: r.earliest_date } : {}),
-    ...(r.fee_lkr !== undefined ? { fee: { amount: r.fee_lkr, currency: lkr } } : {}),
-    perishableWarnings: r.perishable_warnings ?? [],
-    ...(r.reason !== undefined ? { reason: r.reason } : {}),
+    rate: r.rate !== undefined ? { amount: r.rate, currency: r.currency ?? "LKR" } : undefined,
+    reason: r.reason ?? undefined,
   };
 }
 
 export function normalizeOrderConfirmation(raw: unknown): OrderConfirmation {
-  const r = KaprukaRawOrderSchema.parse(raw);
-  const currency = r.currency.toUpperCase() as OrderConfirmation["currency"];
+  const unwrapped = unwrap<any>(raw);
+  const r = KaprukaRawOrderConfirmationSchema.parse(unwrapped);
   return {
     retailerOrderRef: r.order_ref,
-    payLink: r.pay_link,
-    currency,
-    expectedTotal: { amount: r.total, currency },
+    payLink: r.checkout_url,
+    expectedTotal: { amount: r.summary.grand_total, currency: r.summary.currency },
   };
 }
 
 export function normalizeOrderTracking(raw: unknown): OrderTracking {
-  const r = KaprukaRawTrackingSchema.parse(raw);
+  const unwrapped = unwrap<any>(raw);
+  const r = KaprukaRawTrackingSchema.parse(unwrapped);
   return {
-    retailerOrderRef: r.order_ref,
+    retailerOrderRef: r.order_number,
     currentStatus: r.status,
-    timeline: r.timeline ?? [],
-    ...(r.pay_link !== undefined ? { payLink: r.pay_link } : {}),
+    timeline: (r.progress ?? []).map((p) => ({
+      status: p.step,
+      time: p.timestamp,
+    })),
+  };
+}
+
+function rawSummaryToCanonical(r: z.infer<typeof KaprukaRawProductSummarySchema>): ProductSummary {
+  return {
+    id: r.id as ProductId,
+    title: r.name,
+    price: { amount: r.price.amount, currency: r.price.currency },
+    thumbnail: r.image_url ?? undefined,
+    inStock: r.in_stock ?? true,
+    url: r.url,
+  };
+}
+
+function rawProductToCanonical(r: z.infer<typeof KaprukaRawProductSchema>): Product {
+  return {
+    id: r.id as ProductId,
+    title: r.name,
+    description: r.description ?? "",
+    price: { amount: r.price.amount, currency: r.price.currency },
+    images: r.images ?? [],
+    inStock: r.in_stock ?? true,
+    url: r.url,
+    attributes: {}, 
+  };
+}
+
+function rawCategoryToCanonical(r: z.infer<typeof KaprukaRawCategorySchema>): Category {
+  return {
+    id: r.name, 
+    name: r.name,
+    children: (r.children ?? []).map(rawCategoryToCanonical),
   };
 }

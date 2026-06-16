@@ -20,7 +20,7 @@ import { KAPRUKA_ADAPTER, KAPRUKA_TOOL_NAMES } from "./tool-names.js";
 import type { KaprukaTransport } from "./transport.js";
 
 function intentToArgs(intent: SearchIntent): Record<string, unknown> {
-  const args: Record<string, unknown> = { limit: intent.limit };
+  const args: Record<string, unknown> = { limit: intent.limit, response_format: "json" };
   if (intent.query !== undefined) args.q = intent.query;
   if (intent.categoryIds && intent.categoryIds.length > 0) {
     args.category = intent.categoryIds[0];
@@ -48,7 +48,7 @@ export function createKaprukaCatalogueConnector(
     async getProduct(id: ProductId) {
       const raw = await transport.call(
         KAPRUKA_TOOL_NAMES.catalogue.get,
-        { product_id: String(id) },
+        { product_id: String(id), response_format: "json" },
         {
           cacheKey: `product::${String(id)}`,
           cacheTtlMs: transport.ttls.productTtlMs,
@@ -59,7 +59,7 @@ export function createKaprukaCatalogueConnector(
     async listCategories() {
       const raw = await transport.call(
         KAPRUKA_TOOL_NAMES.catalogue.listCategories,
-        {},
+        { response_format: "json" },
         { cacheKey: "categories", cacheTtlMs: transport.ttls.categoriesTtlMs },
       );
       return normalizeCategories(raw);
@@ -76,7 +76,7 @@ export function createKaprukaDeliveryConnector(
     async listDeliveryCities() {
       const raw = await transport.call(
         KAPRUKA_TOOL_NAMES.delivery.listCities,
-        {},
+        { response_format: "json" },
         { cacheKey: "delivery-cities", cacheTtlMs: transport.ttls.citiesTtlMs },
       );
       return normalizeDeliveryCities(raw);
@@ -85,8 +85,9 @@ export function createKaprukaDeliveryConnector(
       // Inventory- and time-sensitive — never cached.
       const raw = await transport.call(KAPRUKA_TOOL_NAMES.delivery.check, {
         city,
-        date,
+        delivery_date: date,
         items,
+        response_format: "json",
       });
       return normalizeDeliveryQuote(raw);
     },
@@ -102,12 +103,14 @@ export function createKaprukaCheckoutConnector(
     async createOrder(orderContext: OrderContext) {
       const raw = await transport.call(KAPRUKA_TOOL_NAMES.checkout.createOrder, {
         order: orderContext as unknown as Record<string, unknown>,
+        response_format: "json",
       });
       return normalizeOrderConfirmation(raw);
     },
     async trackOrder(id: OrderId | string) {
       const raw = await transport.call(KAPRUKA_TOOL_NAMES.checkout.track, {
-        order_ref: String(id),
+        order_number: String(id),
+        response_format: "json",
       });
       return normalizeOrderTracking(raw);
     },

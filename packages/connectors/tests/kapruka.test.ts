@@ -68,8 +68,15 @@ function fakeClient(responses: Record<string, unknown | ((args: any) => unknown)
       }
       const v = responses[name];
       // Unwrap 'params' if present before passing to the response handler
-      const unwrappedArgs = (args && typeof args === 'object' && 'params' in args) ? args.params : args;
-      return typeof v === "function" ? (v as (a: unknown) => unknown)(unwrappedArgs) : v;
+      const unwrappedArgs =
+        args && typeof args === "object" && "params" in args ? args.params : args;
+      const responseBody =
+        typeof v === "function" ? (v as (a: unknown) => unknown)(unwrappedArgs) : v;
+
+      if (responseBody === null) return null;
+
+      // Simulate the Kapruka server's wrapping behavior
+      return { result: JSON.stringify(responseBody) };
     }),
   };
   return { client, calls };
@@ -77,12 +84,12 @@ function fakeClient(responses: Record<string, unknown | ((args: any) => unknown)
 
 function kaprukaProduct(id: string) {
   return {
-    product_id: id,
+    id: id,
     name: `Product ${id}`,
-    thumbnail: "https://img.example.com/p.jpg",
-    price_lkr: 5500,
-    category_ids: ["flowers"],
+    image_url: "https://img.example.com/p.jpg",
+    price: { amount: 5500, currency: "LKR" },
     in_stock: true,
+    url: `https://www.kapruka.com/buyonline/p/kid/${id}`,
   };
 }
 
@@ -192,7 +199,7 @@ describe("Kapruka catalogue connector", () => {
 describe("Kapruka delivery connector", () => {
   it("does not cache checkDelivery (time/inventory sensitive)", async () => {
     const { client } = fakeClient({
-      kapruka_check_delivery: { available: true, perishable_warnings: [] },
+      kapruka_check_delivery: { available: true, rate: 500, currency: "LKR" },
     });
     const transport = new KaprukaTransport({ client });
     const delivery = createKaprukaDeliveryConnector(transport);
@@ -218,9 +225,11 @@ describe("Kapruka checkout connector", () => {
     const { client } = fakeClient({
       kapruka_create_order: {
         order_ref: "KAP-12345",
-        pay_link: "https://pay.kapruka.com/order/KAP-12345",
-        total: 7500,
-        currency: "LKR",
+        checkout_url: "https://pay.kapruka.com/order/KAP-12345",
+        summary: {
+          grand_total: 7500,
+          currency: "LKR",
+        },
       },
     });
     const transport = new KaprukaTransport({ client });
