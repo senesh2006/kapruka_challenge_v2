@@ -117,7 +117,8 @@ export class KaprukaTransport {
       try {
         await this.rateLimiter.acquire(toolName);
         this.fault.beforeRealCall();
-        return await this.client.callTool<T>(toolName, args);
+        // Kapruka tools expect all arguments to be nested under a 'params' field.
+        return await this.client.callTool<T>(toolName, { params: args });
       } catch (err) {
         if (err instanceof KaprukaOutageError) throw err;
         if (attempt >= this.retry.maxAttempts) throw err;
@@ -133,6 +134,12 @@ export class KaprukaTransport {
 function isRetryable(err: unknown): boolean {
   if (err instanceof KaprukaTransientError) return true;
   if (err instanceof Error && err.name === "ZodError") return false;
+  // A tool that returned isError:true is a deterministic application error
+  // (bad args, validation, no such product) — retrying just burns backoff
+  // cycles and latency. The HttpMcpClient tags these with `toolError`.
+  if (err && typeof err === "object" && (err as { toolError?: boolean }).toolError === true) {
+    return false;
+  }
   // Default to retryable: network / timeout / 5xx / 429 surface as generic
   // Errors from real transports; validation errors are explicitly excluded
   // above so we don't retry a malformed payload.

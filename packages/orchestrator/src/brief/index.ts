@@ -37,6 +37,10 @@ export interface WorkingBrief {
   budget?: { min?: number; max?: number; currency: string };
   detectedLocale: Locale;
   slots: IntentSlot[];
+  cartActions?: Array<
+    | { action: "add"; productId: string; quantity: number }
+    | { action: "remove"; productId: string }
+  >;
 }
 
 export interface SlotCandidate {

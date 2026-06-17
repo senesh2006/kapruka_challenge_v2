@@ -67,13 +67,28 @@ export class StubConciergeAgent implements ConciergeAgent {
     const cardRefs = top.map((c) => c.product.id);
     const voice = input.persona.brandVoice || "Hari";
     const occasion = detectOccasion(input.plan.brief.situation);
+    
     if (top.length === 0) {
-      return { reply: `${voice}: ${emptyReplyFor(occasion)}`, cardRefs };
+      return { 
+        reply: `Oh, I'm so sorry! I couldn't find the perfect match right now. Could you tell me a bit more about what you're looking for? I'd love to help you find something special!`, 
+        cardRefs 
+      };
     }
-    const lines = top.map((c) => `· ${c.product.title} — ${c.reason}`);
+
+    const lines = top.map((c) => `· ${c.product.title} — This is a wonderful choice! ${c.reason}`);
+    
+    const salesOpener = [
+      `Hi there! I've found some absolutely beautiful options for this ${occasion}.`,
+      `Since you're looking to make this moment special, I've hand-picked these just for you!`,
+      `You're going to love these selections. They're perfect for the occasion!`
+    ][Math.floor(Math.random() * 3)];
+
+    const crossSell = top.length < 3 ? "\n\nI've also included a little something extra to complete the gift — you can't go wrong with adding some sweets or flowers!" : "";
+
     const reply = [
-      `${voice}: ${openerFor(occasion)}`,
+      `${voice}: ${salesOpener}`,
       ...lines,
+      crossSell,
       summariseDelivery(input.plan.delivery),
     ]
       .filter(Boolean)
@@ -99,13 +114,27 @@ export class CatalogueShopperAgent implements ShopperAgent {
     let result;
     try {
       const connector = await this.connectorFor(input.tenant);
+      console.log(`[Shopper] Searching for: "${input.slot.description}" (slot: ${input.slot.id})`);
       result = await connector.catalogue.searchProducts({
         query: input.slot.description,
         ...(input.slot.categoryHints.length > 0 ? { categoryIds: input.slot.categoryHints } : {}),
         ...(input.brief.detectedLocale !== "tanglish" ? { locale: input.brief.detectedLocale } : {}),
-        limit: 8,
+        limit: 12,
       });
+      console.log(`[Shopper] Found ${result.items.length} items for "${input.slot.description}"`);
     } catch (err) {
+      console.error(`[Shopper] CRITICAL: Search failed for query "${input.slot.description}".`);
+      console.error(`[Shopper] Error details:`, err);
+      if (err instanceof Error) {
+        console.error(`[Shopper] Error Name: ${err.name}`);
+        console.error(`[Shopper] Error Message: ${err.message}`);
+        console.error(`[Shopper] Stack Trace: ${err.stack}`);
+      }
+      // If it's a Zod error (common in normalization), log the issues
+      if (err && typeof err === 'object' && 'issues' in err) {
+        console.error(`[Shopper] Validation Issues:`, JSON.stringify((err as any).issues, null, 2));
+      }
+      
       // Connector outage degrades to "nothing found" rather than killing the
       // turn (NFR-5). The gap still registers as a demand signal, and the
       // degradation is surfaced so observability sees the outage.
@@ -122,7 +151,7 @@ export class CatalogueShopperAgent implements ShopperAgent {
     const candidates: SlotCandidate[] = result.items.map((item, idx) => ({
       slotId: input.slot.id,
       product: item,
-      reason: `Matches "${input.slot.description}"`,
+      reason: `It's a top-rated item that perfectly fits your search for "${input.slot.description}"!`,
       rank: idx,
       appliedRules: [],
     }));
@@ -366,25 +395,36 @@ function slotsForOccasion(occasion: Occasion, message: string): IntentSlot[] {
       ];
     case "apology":
       return [
-        slot("primary", "apology flowers bouquet", ["flowers"]),
-        slot("sweet", "chocolates or a small cake", ["chocolate", "cake"], false),
+        slot("primary", "apology flowers bouquet red roses", ["flowers"]),
+        slot("sweet", "premium chocolate box or luxury cake", ["chocolate", "cake"], false),
       ];
     case "birthday":
       return [
-        slot("primary", "birthday cake", ["cake"]),
-        slot("flowers", "birthday flowers bouquet", ["flowers"], false),
+        slot("primary", "delicious birthday cake chocolate ribbon fruit", ["cake"]),
+        slot("flowers", "cheerful birthday flowers sunflower bouquet", ["flowers"], false),
+        slot("treat", "box of premium chocolates", ["chocolate"], false),
       ];
     case "wedding":
-      return [slot("primary", "wedding gift brass oil lamp homeware", ["wedding", "homeware"])];
+      return [
+        slot("primary", "elegant wedding gift brass oil lamp homeware", ["wedding", "homeware"]),
+        slot("flowers", "luxurious celebratory bouquet", ["flowers"], false),
+      ];
     case "anniversary":
       return [
-        slot("primary", "anniversary red roses bouquet", ["flowers"]),
-        slot("cake", "celebration cake", ["cake"], false),
+        slot("primary", "anniversary red roses bouquet elegant orchids", ["flowers"]),
+        slot("cake", "romantic celebration cake", ["cake"], false),
+        slot("gift", "luxury chocolate collection", ["chocolate"], false),
       ];
     case "newborn":
-      return [slot("primary", "newborn baby gift hamper", ["baby", "hamper"])];
+      return [
+        slot("primary", "newborn baby gift hamper welcome set", ["baby", "hamper"]),
+        slot("flowers", "soft pastel congratulations flowers", ["flowers"], false),
+      ];
     default:
-      return [slot("primary", message, [])];
+      return [
+        slot("primary", message, []),
+        slot("complementary", "popular gift item or treat", ["cake", "flowers", "chocolate"], false),
+      ];
   }
 }
 

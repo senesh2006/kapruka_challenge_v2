@@ -57,7 +57,7 @@ async function flush(rounds = 8): Promise<void> {
 
 const now = "2026-06-05T10:00:00.000Z";
 
-function fakeClient(responses: Record<string, unknown | ((args: unknown) => unknown)>) {
+function fakeClient(responses: Record<string, unknown | ((args: any) => unknown)>) {
   const calls: Array<{ name: string; args: unknown; at: number }> = [];
   const clock = { current: 0 };
   const client: McpClient = {
@@ -67,7 +67,16 @@ function fakeClient(responses: Record<string, unknown | ((args: unknown) => unkn
         throw new Error(`unexpected tool call: ${name}`);
       }
       const v = responses[name];
-      return typeof v === "function" ? (v as (a: unknown) => unknown)(args) : v;
+      // Unwrap 'params' if present before passing to the response handler
+      const unwrappedArgs =
+        args && typeof args === "object" && "params" in args ? args.params : args;
+      const responseBody =
+        typeof v === "function" ? (v as (a: unknown) => unknown)(unwrappedArgs) : v;
+
+      if (responseBody === null) return null;
+
+      // Simulate the Kapruka server's wrapping behavior
+      return { result: JSON.stringify(responseBody) };
     }),
   };
   return { client, calls };
@@ -75,12 +84,12 @@ function fakeClient(responses: Record<string, unknown | ((args: unknown) => unkn
 
 function kaprukaProduct(id: string) {
   return {
-    product_id: id,
+    id: id,
     name: `Product ${id}`,
-    thumbnail: "https://img.example.com/p.jpg",
-    price_lkr: 5500,
-    category_ids: ["flowers"],
+    image_url: "https://img.example.com/p.jpg",
+    price: { amount: 5500, currency: "LKR" },
     in_stock: true,
+    url: `https://www.kapruka.com/buyonline/p/kid/${id}`,
   };
 }
 
@@ -175,7 +184,7 @@ describe("Kapruka catalogue connector", () => {
   it("getProduct caches by id under the product TTL", async () => {
     const vc = new VirtualClock();
     const { client } = fakeClient({
-      kapruka_get_product: (args) => kaprukaProduct((args as { id: string }).id),
+      kapruka_get_product: (args) => kaprukaProduct((args as { product_id: string }).product_id),
     });
     const transport = new KaprukaTransport({ client, clock: vc });
     const cat = createKaprukaCatalogueConnector(transport);
@@ -190,7 +199,7 @@ describe("Kapruka catalogue connector", () => {
 describe("Kapruka delivery connector", () => {
   it("does not cache checkDelivery (time/inventory sensitive)", async () => {
     const { client } = fakeClient({
-      kapruka_check_delivery: { available: true, perishable_warnings: [] },
+      kapruka_check_delivery: { available: true, rate: 500, currency: "LKR" },
     });
     const transport = new KaprukaTransport({ client });
     const delivery = createKaprukaDeliveryConnector(transport);
@@ -216,9 +225,11 @@ describe("Kapruka checkout connector", () => {
     const { client } = fakeClient({
       kapruka_create_order: {
         order_ref: "KAP-12345",
-        pay_link: "https://pay.kapruka.com/order/KAP-12345",
-        total: 7500,
-        currency: "LKR",
+        checkout_url: "https://pay.kapruka.com/order/KAP-12345",
+        summary: {
+          grand_total: 7500,
+          currency: "LKR",
+        },
       },
     });
     const transport = new KaprukaTransport({ client });
@@ -241,9 +252,9 @@ describe("Kapruka rate limiting", () => {
       rateLimit: { perMinute: 2, orderCreationsPerHour: 9999 },
     });
 
-    const p1 = transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: "a" });
-    const p2 = transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: "b" });
-    const p3 = transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: "c" });
+    const p1 = transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: "a" });
+    const p2 = transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: "b" });
+    const p3 = transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: "c" });
 
     await flush();
     expect(client.callTool).toHaveBeenCalledTimes(2);
@@ -289,9 +300,9 @@ describe("Kapruka rate limiting", () => {
       rateLimit: { perMinute: 9999, orderCreationsPerHour: 1 },
     });
 
-    await transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: "a" });
-    await transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: "b" });
-    await transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: "c" });
+    await transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: "a" });
+    await transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: "b" });
+    await transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: "c" });
 
     expect(client.callTool).toHaveBeenCalledTimes(3);
   });
@@ -308,7 +319,7 @@ describe("Kapruka exponential backoff", () => {
     });
     transport.fault.setFailNext(2);
 
-    const p = transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: "x" });
+    const p = transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: "x" });
     await vc.advance(2_000);
     await p;
 
@@ -325,7 +336,7 @@ describe("Kapruka exponential backoff", () => {
     });
     transport.fault.setFailNext(5);
 
-    const p = transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: "x" });
+    const p = transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: "x" });
     await vc.advance(1_000);
     await expect(p).rejects.toThrow(/transient/i);
     expect(client.callTool).not.toHaveBeenCalled();
@@ -341,7 +352,7 @@ describe("Kapruka fault injection — simulated outage", () => {
     });
 
     await expect(
-      transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: "x" }),
+      transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: "x" }),
     ).rejects.toBeInstanceOf(KaprukaOutageError);
     expect(client.callTool).not.toHaveBeenCalled();
   });
@@ -369,13 +380,13 @@ describe("Kapruka fault injection — simulated outage", () => {
     });
 
     for (let i = 0; i < 5; i++) {
-      await expect(transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: String(i) })).rejects.toBeInstanceOf(
+      await expect(transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: String(i) })).rejects.toBeInstanceOf(
         KaprukaOutageError,
       );
     }
 
     transport.fault.setOutage(false);
-    expect(await transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { id: "ok" })).toBeNull();
+    expect(await transport.call(KAPRUKA_TOOL_NAMES.catalogue.get, { product_id: "ok" })).toBeNull();
   });
 });
 

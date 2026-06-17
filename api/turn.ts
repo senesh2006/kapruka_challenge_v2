@@ -40,10 +40,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       customerMessage: message,
     });
 
-    // Persist the session with the appended transcript turn for continuity.
+    // Persist the session with the appended transcript turn and updated cart for continuity.
     const scope = new TenantScope(tenant.id);
     const nextSession = {
       ...session,
+      cart: result.plan.cart,
+      brief: {
+        ...session.brief,
+        situation: result.briefAfter.situation,
+        recipient: result.briefAfter.recipient,
+        budget: result.briefAfter.budget?.max,
+        occasionDate: result.briefAfter.occasionDate,
+      },
       transcript: [
         ...session.transcript,
         { role: "customer" as const, content: message, at: new Date().toISOString() },
